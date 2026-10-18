@@ -1,0 +1,20 @@
+Tạo câu hỏi trắc nghiệm ôn tập cho chương "{{ chapter_title }}" của giáo trình "{{ lecture_title }}".
+
+Chương: {{ chapter_title }} (trang {{ page_start }}–{{ page_end }})
+Số câu hỏi cần tạo: {{ count }}
+
+Yêu cầu:
+- Mỗi câu có đúng 4 lựa chọn khác nhau, chỉ 1 đáp án đúng; answer_index là vị trí đáp án đúng (0–3).
+- Phương án sai phải hợp lý, cùng chủ đề, không quá dễ loại trừ; không dùng "Tất cả các đáp án trên".
+- Ưu tiên câu hỏi kiểm tra hiểu biết khái niệm, không hỏi chi tiết vụn vặt.
+- explanation: 1–2 câu giải thích vì sao đáp án đúng.
+- page_ref: số trang chứa thông tin, theo đánh dấu [[trang N]], trong khoảng {{ page_start }}–{{ page_end }}.
+{% if avoid %}- Không lặp lại các câu hỏi đã có sau:
+{% for q in avoid %}  - {{ q }}
+{% endfor %}{% endif %}
+{% if content_language == "vi" %}- Viết bằng tiếng Việt.{% endif %}
+
+Văn bản chương:
+"""
+{{ chapter_text }}
+"""

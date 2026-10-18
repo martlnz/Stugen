@@ -1,0 +1,12 @@
+# Dev: HTTP thuần trên localhost. Production: đổi thành {$DOMAIN} để Caddy tự cấp HTTPS (ADR-0014).
+http://{$DOMAIN:localhost} {
+	request_body /api/lectures* {
+		max_size 21MB
+	}
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+	handle {
+		reverse_proxy web:3000
+	}
+}

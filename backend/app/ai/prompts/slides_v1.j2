@@ -1,0 +1,16 @@
+Soạn slide trình chiếu cho chương "{{ chapter_title }}" của giáo trình "{{ lecture_title }}" (trang {{ page_start }}–{{ page_end }}), dựa trên tóm tắt chương dưới đây.
+
+Ý chính:
+{% for p in key_points %}- {{ p }}
+{% endfor %}
+{% if terms %}Thuật ngữ:
+{% for t in terms %}- {{ t.term }}: {{ t.definition }}
+{% endfor %}{% endif %}
+
+Yêu cầu:
+- slides: {{ min_slides }}–{{ max_slides }} slide nội dung.
+- Mỗi slide: title dưới 60 ký tự; bullets 2–5 gạch đầu dòng, mỗi dòng dưới 100 ký tự, ngắn gọn dạng ý, không viết cả đoạn văn.
+- notes: 1–3 câu gợi ý cho người thuyết trình.
+- page_refs: các số trang liên quan, nằm trong khoảng {{ page_start }}–{{ page_end }}.
+- Không tạo slide tiêu đề, mục lục hay tổng kết (đã có sẵn).
+{% if content_language == "vi" %}- Viết bằng tiếng Việt.{% endif %}

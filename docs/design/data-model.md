@@ -3,6 +3,8 @@
 > Phiên bản 1.2 · Dựa trên [PRD v2.3](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016 · Cập nhật 19/10/2026
 >
 > Đây là **nguồn chuẩn** cho lược đồ CSDL; lược đồ trong ADR-0006 chỉ là bản phác thảo.
+>
+> Migration đầu tiên (`backend/alembic/versions/*_initial_schema.py`) tạo đúng mục 9, trừ `llm_calls`. Tên ràng buộc theo quy ước `pk_/uq_/ck_/fk_<bảng>_...`.
 
 ## 1. Tổng quan
 
@@ -276,6 +278,8 @@ Index: `(quiz_id, created_at DESC)`.
 
 ### 3.10 `llm_calls` (nội bộ)
 Nhật ký gọi LLM để theo dõi chi phí (ADR-0010). Không lộ qua API.
+
+> **Chưa tạo ở v0.1.0** (kế hoạch để sau). Hiện số token vào/ra được ghi vào log có cấu trúc của worker (`LLM call model=... in=... out=...`).
 
 | Cột | Kiểu | Mô tả |
 |---|---|---|

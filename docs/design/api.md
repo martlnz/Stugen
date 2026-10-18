@@ -1,6 +1,6 @@
 # Tài liệu API
 
-> Dựa trên [PRD v2.3](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 19/10/2026
+> Phiên bản 1.1 · Dựa trên [PRD v2.3](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 19/10/2026 (khớp code v0.1.0)
 
 ## 1. Quy ước chung
 
@@ -10,7 +10,8 @@
 - Tài liệu tương tác (OpenAPI do FastAPI sinh): `/api/docs`, schema: `/api/openapi.json`.
 
 ### 1.2 Xác thực
-- Phiên đăng nhập bằng cookie `sid` (`HttpOnly`, `Secure`, `SameSite=Lax`), xem ADR-0005.
+- Phiên đăng nhập bằng cookie `sid` (`HttpOnly`, `Secure`, `SameSite=Lax`), xem ADR-0005. Trình duyệt chấp nhận cookie `Secure` trên `http://localhost` nên dev không cần HTTPS.
+- Luồng OAuth dùng thêm cookie ký `oauth_state` (sống 10 phút) để giữ `state`, PKCE verifier và `next`.
 - Trình duyệt tự gửi cookie; frontend gọi `fetch` với `credentials: "include"`.
 - Mọi endpoint, trừ nhóm `auth` và `health`, yêu cầu đăng nhập; thiếu hoặc hết hạn phiên → `401 UNAUTHENTICATED`.
 
@@ -81,6 +82,8 @@ Lỗi validate (422) có thêm `errors`:
 | Còn lại | 120 request / phút / người dùng |
 
 Khi vượt giới hạn, response có header `Retry-After` (giây).
+
+> **v0.1.0 chưa triển khai giới hạn tần suất** (để sau theo kế hoạch); mã `429 RATE_LIMITED` chưa được trả.
 
 ## 2. Danh sách endpoint
 
@@ -233,7 +236,7 @@ Danh sách bài giảng của người dùng.
 
 | Query | Mặc định | Mô tả |
 |---|---|---|
-| `q` | – | Tìm theo tên (không phân biệt hoa thường, gần đúng) |
+| `q` | – | Tìm theo tên (không phân biệt hoa thường, chứa chuỗi – `ILIKE`) |
 | `status` | – | Lọc theo trạng thái |
 | `sort` | `-created_at` | `-created_at` · `created_at` · `title` · `-title` |
 | `page`, `page_size` | 1, 20 | Xem 1.5 |
@@ -370,6 +373,8 @@ Cấu trúc `deck` xem [data-model.md](data-model.md#42-slide_decksdeck--slidede
 }
 ```
 
+`error`: `null` hoặc `{ "code": "QUIZ_FAILED", "message": "<thông điệp tiếng Việt>" }` khi `status = failed`. `attempt_count`, `best_score`, `last_attempt_at` chỉ tính các lần làm của người dùng hiện tại.
+
 ### `GET /lectures/{id}/quizzes`
 Danh sách quiz của bài giảng, mới nhất trước (không phân trang).
 
@@ -440,6 +445,8 @@ Nộp bài và chấm điểm.
 {
   "id": "e8d7c6b5-...",
   "quiz_id": "a41f9e22-...",
+  "lecture_id": "5d2c8a40-...",
+  "lecture_title": "Nhập môn Cơ sở dữ liệu",
   "score": 7,
   "total": 10,
   "created_at": "2026-10-18T10:05:00Z",
@@ -462,7 +469,9 @@ Nộp bài và chấm điểm.
   ]
 }
 ```
-`by_chapter` giúp người dùng biết chương nào cần ôn lại.
+`by_chapter` giúp người dùng biết chương nào cần ôn lại. `lecture_id`, `lecture_title` để trang kết quả liên kết về bài giảng và tab PDF gốc.
+
+Lỗi validate có `errors`, ví dụ `[{ "field": "answers.<question_id>", "message": "Câu hỏi không thuộc quiz này." }]`. **409** `QUIZ_NOT_READY` nếu quiz chưa `completed`.
 
 ### `GET /quizzes/{id}/attempts`
 Lịch sử làm bài, mới nhất trước. Hỗ trợ phân trang.

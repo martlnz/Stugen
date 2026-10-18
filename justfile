@@ -35,3 +35,7 @@ fmt:
 
 gen-api:
     cd frontend; npm run gen:api
+
+# CHỈ DÙNG LOCAL: tạo phiên đăng nhập dev, in token cho cookie sid
+session email="dev@example.com":
+    docker compose exec api python -m scripts.dev_session {{email}}

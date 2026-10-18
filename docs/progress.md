@@ -1,7 +1,7 @@
 # Tiến độ dự án Stugen
 
 > **Đọc file này đầu tiên khi mở phiên mới.** Cập nhật ngay sau mỗi việc hoàn thành (mục 2, 3, 6) và trước khi kết thúc phiên.
-> Cập nhật lần cuối: 19/10/2026 · Commit gần nhất: xem `git log --oneline -5`
+> Cập nhật lần cuối: 19/10/2026 (v0.1.0) · Commit gần nhất: xem `git log --oneline -5`
 
 ## 1. Trạng thái hiện tại
 
@@ -9,7 +9,8 @@
 |---|---|
 | Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ Xong, đã thống nhất (ADR-0015, ADR-0016) |
 | Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu, image Docker) | ✅ Xong (kiểm tra lại 19/10) |
-| Code (Khối 1–8 trong [kế hoạch](plans/plan-1-ngay.md)) | ⏳ Chưa bắt đầu – **việc tiếp theo: Khối 1** |
+| Code (Khối 1–8 trong [kế hoạch](plans/plan-1-ngay.md)) | ✅ Xong v0.1.0 – trọn luồng chạy trên `http://localhost`; hạn chế: [known-issues.md](known-issues.md) |
+| Đăng nhập Google thật | ⏳ Chờ chủ dự án bấm thử một lần (mục 3) |
 
 - Repo: `D:\Stugen` · GitHub: https://github.com/martlnz/Stugen (**public**, AGPL-3.0), nhánh `main`.
 - Mở phiên Claude Code mới **trong thư mục `D:\Stugen`**.
@@ -44,17 +45,32 @@
 - Kéo sẵn image: `postgres:16-alpine`, `redis:7-alpine`, `caddy:2-alpine`, `python:3.12-slim`, `node:22-alpine`, MinIO Chainguard. Cổng 80, 5432, 6379, 9000, 9001 trống.
 - Không có Claude in Chrome: kiểm thử luồng cần đăng nhập bằng cách tạo user + session trong DB local qua script dev (`docker exec`); chủ dự án tự đăng nhập Google thật một lần để xác nhận OAuth.
 
+### 19/10/2026 · Phiên 3 – Code Khối 1–8, phát hành v0.1.0
+- **Khối 1:** `docker-compose.yml` (+ `override` dev mount source, uvicorn `--reload`), `Caddyfile` HTTP, `justfile`; FastAPI skeleton (`AppError`, CSRF `X-Requested-With`, `/api/health`), models + migration đầu tiên (có `pg_trgm`), Celery `ping`; Next.js **16.4** + shadcn/ui (bản **Base UI**, dùng prop `render` thay `asChild`), `src/lib/api.ts`.
+- **Khối 2:** Authlib + PKCE, bảng `sessions` (SHA-256, sliding 7 ngày), cookie `sid`, `/me`, logout; state OAuth trong cookie ký `oauth_state`.
+- **Khối 3:** `Storage` (boto3 → MinIO, tự tạo bucket), upload kiểm tra kích thước/`%PDF-`/mã hoá/số trang, thư viện, đổi tên, xoá, `/pdf` có `Range`.
+- **Khối 4–6:** `ai/pdf.py` (NFC, bỏ NBSP, lọc header/footer thay chữ số bằng ký tự đại diện, chia chương bookmark → heuristic tiêu đề → chia đều; cắt theo **dòng** khi hai chương cùng trang), `LLMClient` `openai_compatible` (json_object + ví dụ JSON sinh từ schema, tắt thinking, sửa 1 lần), `FakeLLMClient`, prompt `*_v1.j2`, pipeline idempotent theo chương, PPTX, quiz (phân bổ theo độ dài, xáo đáp án), API summary/slides/quiz/attempts.
+- **Khối 7:** UI thư viện, tải lên (cảnh báo dịch vụ AI bên thứ ba), trang bài giảng (tiến trình, thử lại, tab Tóm tắt/Slide/Quiz/PDF), làm quiz, kết quả; trạng thái rỗng, skeleton, cảnh báo "Nội dung do AI tạo".
+- **Khối 8:** 43 test pytest qua; `just lint` sạch; chạy trọn luồng với 3 PDF mẫu bằng DeepSeek thật và Chromium headless (Playwright cài tạm ngoài repo) – xem [known-issues.md](known-issues.md). Cập nhật README, api.md 1.1, data-model (ghi chú `llm_calls`), `.env.example`.
+- **Quyết định trong phiên (không trái ADR):**
+  - DeepSeek vượt giới hạn độ dài (bullet 120 ký tự, ≤ 10 thuật ngữ) và sửa lại vẫn sai → schema LLM **cắt gọn bằng code** thay vì báo lỗi; lỗi cấu trúc/trang vẫn sửa 1 lần (ADR-0015).
+  - `AttemptResult` thêm `lecture_id`, `lecture_title`; `QuizSummary.error.code = QUIZ_FAILED` (api.md 1.1).
+  - Dev chạy uvicorn `--reload` (override); `Dockerfile` backend vẫn dùng gunicorn cho production.
+  - `.gitattributes` ép LF (file chạy trong container).
+  - Script dev `backend/scripts/dev_session.py` / `just session` tạo phiên đăng nhập local (không thêm endpoint đăng nhập giả).
+
 ## 3. Việc tiếp theo
 
-**Khối 1 · Nền tảng** (xem [plan-1-ngay.md](plans/plan-1-ngay.md)). Trước khi làm, chủ dự án sửa `.env` (mục 5.1).
+**Chủ dự án**
+- [ ] Mở <http://localhost>, bấm "Đăng nhập với Google" bằng Gmail trong *Test users* → về `/library`, F5 vẫn đăng nhập, đăng xuất được. Báo lại nếu lỗi (xem `just logs`).
 
-- [ ] `justfile` (PowerShell trên Windows; `test`/`lint` backend chạy trong container `api`)
-- [ ] `docker-compose.yml` (proxy, web, api, worker, postgres, redis, minio), `Caddyfile` HTTP `localhost`
-- [ ] Backend: FastAPI skeleton, `pydantic-settings` (đọc cả `CONTENT_LANGUAGE`), handler lỗi `AppError`, `GET /api/health`; `openapi_url=/api/openapi.json`, `docs_url=/api/docs`
-- [ ] Models SQLAlchemy theo `docs/design/data-model.md` v1.2 (trừ `llm_calls`; nhớ 2 cột `chapters.summary`, `chapters.slides`), migration Alembic đầu tiên
-- [ ] Celery app + task `ping`
-- [ ] Frontend: Next.js + Tailwind + shadcn/ui, `src/lib/api.ts`, trang chủ tĩnh
-- [ ] Kiểm tra: `http://localhost` ra trang chủ, `/api/health` trả `ok`, migrate tạo đủ bảng
+**Sau v0.1.0** (theo "Để sau" trong [kế hoạch](plans/plan-1-ngay.md) và [known-issues.md](known-issues.md))
+- [ ] Giới hạn tần suất (api.md 1.7).
+- [ ] Celery beat + `cleanup_orphans` (ADR-0014): dọn phiên hết hạn, file MinIO mồ côi.
+- [ ] Bảng `llm_calls` (migration mới) để theo dõi chi phí.
+- [ ] Ô tìm kiếm/lọc/sắp xếp ở thư viện (API đã hỗ trợ).
+- [ ] CI (GitHub Actions: ruff, pytest, eslint, tsc).
+- [ ] Triển khai thật: domain/VPS, Caddy HTTPS (`{$DOMAIN}`), sao lưu.
 
 ## 4. Môi trường
 
@@ -89,13 +105,14 @@ Mở `notepad D:/Stugen/.env`, sửa rồi **Ctrl+S**:
 
 Trạng thái 19/10: ✅ đã sửa xong và kiểm tra lại trong container.
 
-Chưa có volume Postgres nên đổi tên lúc này không mất dữ liệu.
-
-### 5.2 Lưu ý khi làm Khối 4 (trích xuất PDF + LLM)
+### 5.2 Ghi chú pipeline (đã áp dụng trong code v0.1.0)
 - Văn bản trích từ PDF mẫu **không ở dạng NFC** → bắt buộc chuẩn hoá NFC (ADR-0009).
 - Header trích ra chứa **NBSP (`\xa0`)** → đổi về dấu cách trước khi so khớp dòng lặp.
 - Footer "Trang N" khác nhau mỗi trang → quy tắc "dòng giống nhau ≥ 50% trang" không bắt được; **thay chữ số bằng ký tự đại diện** trước khi đếm.
-- **DeepSeek:** quy tắc đã chốt trong ADR-0016 (ghi chú triển khai) và `CLAUDE.md`.
+- **DeepSeek:** quy tắc đã chốt trong ADR-0016 (ghi chú triển khai) và `CLAUDE.md`. Giới hạn độ dài hiển thị do code cắt (xem nhật ký phiên 3).
+
+### 5.3 Docker Desktop sập khi build frontend
+`docker compose build web` hai lần làm WSL engine dừng (`exit status 0xc00000fd`). Đã giới hạn heap Node khi build. Nếu gặp lại: thoát Docker Desktop, `wsl --shutdown`, mở lại rồi `just up`.
 
 ## 6. Quyết định đang chờ chủ dự án
 

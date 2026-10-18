@@ -8,7 +8,7 @@
 | Hạng mục | Trạng thái |
 |---|---|
 | Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ Xong, đã thống nhất (ADR-0015, ADR-0016) |
-| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu, image Docker) | ⚠️ Còn sửa đuôi `/app` → `/stugen` trong 2 biến `DATABASE_URL*` (mục 5.1) |
+| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu, image Docker) | ✅ Xong (kiểm tra lại 19/10) |
 | Code (Khối 1–8 trong [kế hoạch](plans/plan-1-ngay.md)) | ⏳ Chưa bắt đầu – **việc tiếp theo: Khối 1** |
 
 - Repo: `D:\Stugen` · GitHub: https://github.com/martlnz/Stugen (**public**, AGPL-3.0), nhánh `main`.
@@ -87,7 +87,7 @@ Mở `notepad D:/Stugen/.env`, sửa rồi **Ctrl+S**:
 - `S3_BUCKET=stugen`
 - `LLM_MODEL_FAST=deepseek-flash`
 
-Trạng thái 19/10: đã sửa xong, **trừ đuôi `/app` ở cuối `DATABASE_URL` và `DATABASE_URL_SYNC`**.
+Trạng thái 19/10: ✅ đã sửa xong và kiểm tra lại trong container.
 
 Chưa có volume Postgres nên đổi tên lúc này không mất dữ liệu.
 

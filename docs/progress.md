@@ -8,7 +8,7 @@
 | Hạng mục | Trạng thái |
 |---|---|
 | Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ Xong, đã thống nhất (ADR-0015, ADR-0016) |
-| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu) | ⚠️ Cần sửa `.env` theo ADR-0016 (mục 5.1) |
+| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu, image Docker) | ⚠️ Còn sửa đuôi `/app` → `/stugen` trong 2 biến `DATABASE_URL*` (mục 5.1) |
 | Code (Khối 1–8 trong [kế hoạch](plans/plan-1-ngay.md)) | ⏳ Chưa bắt đầu – **việc tiếp theo: Khối 1** |
 
 - Repo: `D:\Stugen` · GitHub: https://github.com/martlnz/Stugen (**public**, AGPL-3.0), nhánh `main`.
@@ -37,7 +37,12 @@
 - Đổi tên user/database PostgreSQL và bucket MinIO thành **`stugen`**.
 - DeepSeek là LLM mặc định; đã xác minh trên api-docs.deepseek.com: model `deepseek-v4-pro` và `deepseek-flash` (`deepseek-v4-flash` đã ngừng); chỉ có `json_object`; tắt thinking bằng `extra_body={"thinking": {"type": "disabled"}}`.
 - Cập nhật `CLAUDE.md`, README, `.env.example`, PRD 2.3 (lưu ý dịch vụ AI bên thứ ba), data-model 1.2 (bucket), api.md, plan, ADR README; trạng thái ADR-0003/0007/0010.
-- Thêm `LICENSE` (AGPL-3.0); repo GitHub chuyển public.
+- Thêm `LICENSE` (AGPL-3.0); repo GitHub chuyển public. (`132d369`)
+- Kiểm tra `.env` trong container (chỉ in đúng/sai): mọi biến đạt, trừ đuôi DB trong `DATABASE_URL*` vẫn là `/app`.
+- DeepSeek: key hoạt động, số dư ~4.94 USD; `/models` có `deepseek-flash`, `deepseek-v4-pro`. Gọi thử `json_object` + `thinking: disabled` trả JSON hợp lệ ở cả 2 model, nhưng **trả tiếng Anh dù system prompt tiếng Việt** → prompt phải ghi rõ "trả lời bằng tiếng Việt".
+- **MinIO đã ngừng phát hành image miễn phí** (`minio/minio` trên Docker Hub và Quay không còn kéo được). Dùng `cgr.dev/chainguard/minio` và `cgr.dev/chainguard/minio-client` (miễn phí, bản RELEASE.2026-09-22; chỉ có tag `latest`; chạy với user 65532, entrypoint `/usr/bin/minio`). Vẫn là MinIO nên không trái ADR-0007.
+- Kéo sẵn image: `postgres:16-alpine`, `redis:7-alpine`, `caddy:2-alpine`, `python:3.12-slim`, `node:22-alpine`, MinIO Chainguard. Cổng 80, 5432, 6379, 9000, 9001 trống.
+- Không có Claude in Chrome: kiểm thử luồng cần đăng nhập bằng cách tạo user + session trong DB local qua script dev (`docker exec`); chủ dự án tự đăng nhập Google thật một lần để xác nhận OAuth.
 
 ## 3. Việc tiếp theo
 
@@ -81,6 +86,8 @@ Mở `notepad D:/Stugen/.env`, sửa rồi **Ctrl+S**:
 - `POSTGRES_USER=stugen`, `POSTGRES_DB=stugen`; trong `DATABASE_URL` và `DATABASE_URL_SYNC` đổi `app:` → `stugen:` và `/app` cuối → `/stugen` (giữ nguyên mật khẩu).
 - `S3_BUCKET=stugen`
 - `LLM_MODEL_FAST=deepseek-flash`
+
+Trạng thái 19/10: đã sửa xong, **trừ đuôi `/app` ở cuối `DATABASE_URL` và `DATABASE_URL_SYNC`**.
 
 Chưa có volume Postgres nên đổi tên lúc này không mất dữ liệu.
 

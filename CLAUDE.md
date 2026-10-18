@@ -6,6 +6,8 @@ Hướng dẫn cho Claude Code khi làm việc trong repository này.
 
 **Stugen** – website phi thương mại: đăng nhập bằng Google, tải giáo trình PDF, sinh **tóm tắt**, **slide**, **quiz**; lưu bài giảng theo tài khoản.
 
+**Bắt đầu mỗi phiên: đọc `docs/progress.md`** – trạng thái hiện tại, việc tiếp theo, vấn đề mở.
+
 Tài liệu nguồn (đọc trước khi làm tính năng liên quan):
 - `docs/product/PRD.md` – yêu cầu và phạm vi
 - `docs/adr/` – quyết định kiến trúc (0001–0014)
@@ -72,6 +74,7 @@ make gen-api     # = cd frontend && npm run gen:api → openapi-typescript http:
 - Thay đổi lược đồ → tạo migration Alembic, không sửa migration đã có.
 
 **Tài liệu**
+- Xong một việc (hoặc trước khi kết thúc phiên) → cập nhật `docs/progress.md`: nhật ký, việc tiếp theo, vấn đề mở, commit gần nhất.
 - Thay đổi endpoint → cập nhật `docs/design/api.md`. Thay đổi bảng → cập nhật `docs/design/data-model.md`.
 - Quyết định đi ngược một ADR → dừng lại hỏi người dùng; nếu đồng ý thì viết ADR mới theo `docs/adr/template.md`.
 
@@ -100,5 +103,5 @@ make gen-api     # = cd frontend && npm run gen:api → openapi-typescript http:
 
 1. `make lint` và `make test` đều qua.
 2. Đã chạy thử luồng liên quan trên `http://localhost`.
-3. Tài liệu trong `docs/` đã cập nhật nếu API hoặc lược đồ thay đổi.
+3. Tài liệu trong `docs/` đã cập nhật nếu API hoặc lược đồ thay đổi; `docs/progress.md` đã ghi lại việc vừa làm.
 4. Commit theo Conventional Commits: `feat(api): ...`, `fix(worker): ...`, `docs: ...`.

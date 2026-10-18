@@ -64,6 +64,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 | [ADR](docs/adr/README.md) | 15 quyết định kiến trúc và lý do lựa chọn |
 | [Mô hình dữ liệu](docs/design/data-model.md) | ERD, chi tiết bảng, cấu trúc JSONB, vòng đời trạng thái, DDL |
 | [Tài liệu API](docs/design/api.md) | Hợp đồng REST giữa frontend và backend, mã lỗi |
+| [Tiến độ](docs/progress.md) | Đã làm gì, việc tiếp theo, vấn đề mở – đọc đầu tiên khi tiếp tục dự án |
 | [Kế hoạch 1 ngày](docs/plans/plan-1-ngay.md) | Lịch phát triển MVP theo từng khối |
 | [CLAUDE.md](CLAUDE.md) | Quy tắc code và quy trình khi làm việc với Claude Code |
 
@@ -76,7 +77,10 @@ Stugen/
 ├── README.md
 ├── CLAUDE.md                  # Hướng dẫn cho Claude Code
 ├── .env.example               # Mẫu biến môi trường
+├── scripts/
+│   └── make_sample_pdfs.py    # Sinh PDF mẫu để thử pipeline
 └── docs/
+    ├── progress.md            # Tiến độ, việc tiếp theo
     ├── product/
     │   └── PRD.md             # Yêu cầu sản phẩm
     ├── design/

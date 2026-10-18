@@ -1,7 +1,7 @@
 # Tiến độ dự án Stugen
 
 > **Đọc file này đầu tiên khi mở phiên mới.** Cập nhật ngay sau mỗi việc hoàn thành (mục 2, 3, 6) và trước khi kết thúc phiên.
-> Cập nhật lần cuối: 19/10/2026 · Commit gần nhất: `bc4df4e`
+> Cập nhật lần cuối: 19/10/2026 · Commit gần nhất: xem `git log --oneline -5`
 
 ## 1. Trạng thái hiện tại
 

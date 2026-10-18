@@ -1,6 +1,6 @@
 # ADR-0010: Chiến lược gọi LLM – theo chương, đầu ra có cấu trúc
 
-- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0015](0015-lam-ro-pipeline-llm.md)
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0015](0015-lam-ro-pipeline-llm.md), [ADR-0016](0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md)
 - **Ngày:** 2026-10-18
 
 ## Bối cảnh

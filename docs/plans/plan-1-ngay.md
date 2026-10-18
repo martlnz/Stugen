@@ -24,7 +24,7 @@
 
 ## Chuẩn bị trước (tối hôm trước hoặc 30 phút đầu)
 
-- [ ] Cài Docker Desktop, Node 22, Python 3.12, `uv` (hoặc pip), Claude Code.
+- [ ] Cài Docker Desktop, Node 22, `just`, Claude Code (Python 3.12 không bắt buộc – test chạy trong container, ADR-0016).
 - [ ] Tạo OAuth Client trên Google Cloud Console (loại *Web application*), thêm redirect URI `http://localhost/api/auth/google/callback`, thêm email của bạn vào *Test users*.
 - [ ] Có API key LLM.
 - [ ] Giải nén `project-docs.zip` vào thư mục repo, `git init`, `cp .env.example .env`, điền giá trị.
@@ -34,13 +34,13 @@
 
 ### Khối 1 · 08:00–09:30 · Nền tảng
 
-- Docker Compose đủ các service, Caddyfile (HTTP, `localhost`), Makefile theo `CLAUDE.md`.
+- Docker Compose đủ các service, Caddyfile (HTTP, `localhost`), `justfile` theo `CLAUDE.md`.
 - Backend: FastAPI skeleton, `pydantic-settings`, handler lỗi chung, `GET /api/health`.
 - Models SQLAlchemy cho tất cả bảng trong `docs/design/data-model.md` (trừ `llm_calls`), migration Alembic đầu tiên.
 - Celery app rỗng + task `ping`.
 - Frontend: Next.js + Tailwind + shadcn/ui, `src/lib/api.ts`, trang chủ tĩnh.
 
-**Xong khi:** `make up` → `http://localhost` hiện trang chủ, `http://localhost/api/health` trả `ok`, `make migrate` tạo đủ bảng.
+**Xong khi:** `just up` → `http://localhost` hiện trang chủ, `http://localhost/api/health` trả `ok`, `just migrate` tạo đủ bảng.
 
 > Gợi ý giao việc: *"Đọc CLAUDE.md, docs/adr/0002, 0006, 0014 và docs/design/data-model.md. Dựng skeleton theo Khối 1 trong docs/plans/plan-1-ngay.md."*
 
@@ -110,7 +110,7 @@
 ### Khối 8 · 18:00–19:00 · Kiểm thử tổng và đóng ngày
 
 - Chạy trọn luồng với cả 3 PDF mẫu; ghi lại lỗi vào `docs/known-issues.md`.
-- `make lint`, `make test` qua.
+- `just lint`, `just test` qua.
 - Cập nhật `docs/design/api.md`, `docs/design/data-model.md` nếu có lệch so với code.
 - README: cách chạy dự án từ đầu.
 - Commit, tag `v0.1.0`.

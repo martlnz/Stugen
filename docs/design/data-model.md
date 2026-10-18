@@ -1,6 +1,6 @@
 # Mô hình dữ liệu
 
-> Phiên bản 1.1 · Dựa trên [PRD v2.2](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015 · Cập nhật 18/10/2026
+> Phiên bản 1.2 · Dựa trên [PRD v2.3](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016 · Cập nhật 19/10/2026
 >
 > Đây là **nguồn chuẩn** cho lược đồ CSDL; lược đồ trong ADR-0006 chỉ là bản phác thảo.
 
@@ -394,7 +394,7 @@ Dữ liệu sẵn có theo bước:
 
 ## 7. Lưu trữ file (MinIO)
 
-Bucket riêng tư `lectures`:
+Bucket riêng tư `stugen` (ADR-0016):
 
 ```
 users/{user_id}/lectures/{lecture_id}/source.pdf

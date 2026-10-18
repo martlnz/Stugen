@@ -1,8 +1,8 @@
 # ADR-0003: Frontend dùng Next.js + TypeScript
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0016](0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md)
 - **Ngày:** 2026-10-18
-- **Ghi chú:** Lệnh sinh kiểu API chuẩn là `make gen-api` (xem `CLAUDE.md`), lấy schema từ `http://localhost/api/openapi.json`.
+- **Ghi chú:** Lệnh sinh kiểu API chuẩn là `just gen-api` (xem `CLAUDE.md`; ADR-0016 thay cho `make gen-api`), lấy schema từ `http://localhost/api/openapi.json`.
 
 ## Bối cảnh
 PRD cho phép chọn công nghệ frontend tốt nhất. Giao diện cần: danh sách thư viện, upload kéo-thả, hiển thị Markdown + công thức toán, trình chiếu slide, làm quiz; chạy tốt trên mobile.

@@ -1,6 +1,6 @@
 # PRD – Stugen: Website tạo học liệu từ giáo trình PDF
 
-> Dự án phi thương mại · Phiên bản 2.2 · 18/10/2026
+> Dự án phi thương mại · Phiên bản 2.3 · 19/10/2026
 >
 > Tài liệu liên quan: [Mô hình dữ liệu](../design/data-model.md) · [Tài liệu API](../design/api.md) · [ADR](../adr/README.md)
 
@@ -69,6 +69,7 @@ Mọi bài giảng đã tạo được lưu theo tài khoản để xem lại sa
 - Giao diện tiếng Việt, dùng tốt trên cả máy tính và điện thoại.
 - File PDF lưu riêng tư; API luôn kiểm tra quyền sở hữu.
 - Hiển thị lưu ý: nội dung do AI tạo, nên đối chiếu với giáo trình.
+- Hiển thị lưu ý ở trang tải lên: nội dung giáo trình được gửi tới dịch vụ AI bên thứ ba (mặc định DeepSeek, [ADR-0016](../adr/0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md)) để xử lý.
 
 ## 5. Kiến trúc
 

@@ -7,11 +7,11 @@
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ Xong, đã thống nhất (ADR-0015) |
-| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu) | ✅ Xong |
+| Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ Xong, đã thống nhất (ADR-0015, ADR-0016) |
+| Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu) | ⚠️ Cần sửa `.env` theo ADR-0016 (mục 5.1) |
 | Code (Khối 1–8 trong [kế hoạch](plans/plan-1-ngay.md)) | ⏳ Chưa bắt đầu – **việc tiếp theo: Khối 1** |
 
-- Repo: `D:\Stugen` · GitHub: https://github.com/martlnz/Stugen (**private**), nhánh `main`.
+- Repo: `D:\Stugen` · GitHub: https://github.com/martlnz/Stugen (**public**, AGPL-3.0), nhánh `main`.
 - Mở phiên Claude Code mới **trong thư mục `D:\Stugen`**.
 
 ## 2. Nhật ký công việc
@@ -32,14 +32,21 @@
 - Chọn LLM **DeepSeek** qua provider `openai_compatible`.
 - Viết `scripts/make_sample_pdfs.py`, sinh 3 PDF mẫu vào `samples/` (git-ignored). (`bc4df4e`)
 
+### 19/10/2026 · Phiên 2 – Chốt quyết định còn chờ → ADR-0016
+- Chạy lệnh bằng **`just`** thay `make`; `just test`/`just lint` backend chạy trong container `api` nên máy không cần Python 3.12.
+- Đổi tên user/database PostgreSQL và bucket MinIO thành **`stugen`**.
+- DeepSeek là LLM mặc định; đã xác minh trên api-docs.deepseek.com: model `deepseek-v4-pro` và `deepseek-flash` (`deepseek-v4-flash` đã ngừng); chỉ có `json_object`; tắt thinking bằng `extra_body={"thinking": {"type": "disabled"}}`.
+- Cập nhật `CLAUDE.md`, README, `.env.example`, PRD 2.3 (lưu ý dịch vụ AI bên thứ ba), data-model 1.2 (bucket), api.md, plan, ADR README; trạng thái ADR-0003/0007/0010.
+- Thêm `LICENSE` (AGPL-3.0); repo GitHub chuyển public.
+
 ## 3. Việc tiếp theo
 
-**Khối 1 · Nền tảng** (xem [plan-1-ngay.md](plans/plan-1-ngay.md)). Trước khi làm, xử lý 2 vấn đề môi trường ở mục 5.
+**Khối 1 · Nền tảng** (xem [plan-1-ngay.md](plans/plan-1-ngay.md)). Trước khi làm, chủ dự án sửa `.env` (mục 5.1).
 
-- [ ] Quyết định cách chạy lệnh thay `make` trên Windows (mục 5.1)
+- [ ] `justfile` (PowerShell trên Windows; `test`/`lint` backend chạy trong container `api`)
 - [ ] `docker-compose.yml` (proxy, web, api, worker, postgres, redis, minio), `Caddyfile` HTTP `localhost`
 - [ ] Backend: FastAPI skeleton, `pydantic-settings` (đọc cả `CONTENT_LANGUAGE`), handler lỗi `AppError`, `GET /api/health`; `openapi_url=/api/openapi.json`, `docs_url=/api/docs`
-- [ ] Models SQLAlchemy theo `docs/design/data-model.md` v1.1 (trừ `llm_calls`; nhớ 2 cột `chapters.summary`, `chapters.slides`), migration Alembic đầu tiên
+- [ ] Models SQLAlchemy theo `docs/design/data-model.md` v1.2 (trừ `llm_calls`; nhớ 2 cột `chapters.summary`, `chapters.slides`), migration Alembic đầu tiên
 - [ ] Celery app + task `ping`
 - [ ] Frontend: Next.js + Tailwind + shadcn/ui, `src/lib/api.ts`, trang chủ tĩnh
 - [ ] Kiểm tra: `http://localhost` ra trang chủ, `/api/health` trả `ok`, migrate tạo đủ bảng
@@ -49,13 +56,13 @@
 | Thành phần | Trạng thái |
 |---|---|
 | `.env` | ✅ Đủ. `SESSION_SECRET`, mật khẩu Postgres/MinIO sinh ngẫu nhiên; `DATABASE_URL*` khớp mật khẩu; Google ID/secret và `LLM_API_KEY` đúng định dạng |
-| LLM | `LLM_PROVIDER=openai_compatible`, `LLM_BASE_URL=https://api.deepseek.com`, `LLM_MODEL=deepseek-v4-pro`, `LLM_MODEL_FAST=deepseek-v4-flash` |
+| LLM | `LLM_PROVIDER=openai_compatible`, `LLM_BASE_URL=https://api.deepseek.com`, `LLM_MODEL=deepseek-v4-pro`, `LLM_MODEL_FAST=deepseek-flash` (cần sửa trong `.env`, mục 5.1) |
 | Google OAuth | Client "Stugen local", Testing mode, email chủ dự án trong Test users |
 | Docker | 29.8.2, Compose v5.6.0 ✅ |
 | Node | 24.21.0 (Dockerfile frontend vẫn dùng Node 22 theo ADR-0014) |
 | uv | 0.12.5 ✅ |
-| Python | Máy có 3.14; **chưa có 3.12** (mục 5.2) |
-| make | ❌ **Chưa có** (mục 5.1) |
+| Python | Máy có 3.13, 3.14; không cần 3.12 (test chạy trong container, ADR-0016) |
+| just | ✅ Đã cài (winget `Casey.Just`) |
 
 **Quy tắc với `.env`:** không đọc/in giá trị (chỉ kiểm tra đúng/sai). Sửa bằng `notepad D:/Stugen/.env` rồi **Ctrl+S** – Notepad Windows 11 giữ nội dung trong tab mà không ghi file nếu chưa lưu; tab mở từ trước có thể ghi đè bản mới. Nếu mật khẩu bị ghi đè về `change-me`: sinh lại bằng script tạm (đã mất khi đổi phiên) hoặc nhờ Claude viết lại script ghi thẳng vào `.env` không in ra.
 
@@ -69,25 +76,24 @@
 
 ## 5. Vấn đề mở
 
-### 5.1 Không có `make` trên Windows
-`CLAUDE.md` dùng `make up/test/lint/...`. Phương án (chưa chọn):
-- Cài GNU Make: `winget install ezwinports.make` – giữ nguyên `CLAUDE.md`. **Đề xuất.**
-- Hoặc dùng `just` / script `tasks.ps1` – phải sửa `CLAUDE.md` và README.
+### 5.1 Sửa `.env` theo ADR-0016 (chủ dự án tự làm, Claude không đọc `.env`)
+Mở `notepad D:/Stugen/.env`, sửa rồi **Ctrl+S**:
+- `POSTGRES_USER=stugen`, `POSTGRES_DB=stugen`; trong `DATABASE_URL` và `DATABASE_URL_SYNC` đổi `app:` → `stugen:` và `/app` cuối → `/stugen` (giữ nguyên mật khẩu).
+- `S3_BUCKET=stugen`
+- `LLM_MODEL_FAST=deepseek-flash`
 
-### 5.2 Chưa có Python 3.12
-Backend chạy trong Docker nên không bắt buộc. Để chạy `pytest`/`ruff` ngoài container: `uv python install 3.12` rồi tạo venv `backend/.venv` bằng uv.
+Chưa có volume Postgres nên đổi tên lúc này không mất dữ liệu.
 
-### 5.3 Lưu ý khi làm Khối 4 (trích xuất PDF + LLM)
+### 5.2 Lưu ý khi làm Khối 4 (trích xuất PDF + LLM)
 - Văn bản trích từ PDF mẫu **không ở dạng NFC** → bắt buộc chuẩn hoá NFC (ADR-0009).
 - Header trích ra chứa **NBSP (`\xa0`)** → đổi về dấu cách trước khi so khớp dòng lặp.
 - Footer "Trang N" khác nhau mỗi trang → quy tắc "dòng giống nhau ≥ 50% trang" không bắt được; **thay chữ số bằng ký tự đại diện** trước khi đếm.
-- **DeepSeek:** chỉ hỗ trợ `response_format={"type": "json_object"}` (không có `json_schema`) → prompt phải chứa chữ "json" + ví dụ JSON mẫu; có thể trả nội dung rỗng → coi là đầu ra sai (sửa 1 lần); đặt `max_tokens` 4–8K; tắt chế độ thinking; timeout ~120 giây. Thiết kế provider có cờ hỗ trợ `json_schema` hay không.
-- Kiểm tra lại tên model DeepSeek trên api-docs.deepseek.com (thông tin `deepseek-v4-*` lấy từ nguồn thứ ba).
+- **DeepSeek:** quy tắc đã chốt trong ADR-0016 (ghi chú triển khai) và `CLAUDE.md`.
 
 ## 6. Quyết định đang chờ chủ dự án
 
-- [ ] Repo private hay public? Giấy phép (gợi ý **AGPL-3.0** vì PyMuPDF là AGPL)
-- [ ] Có cập nhật tài liệu cho DeepSeek không: ví dụ cấu hình trong `.env.example`, README, câu lưu ý "nội dung được xử lý bởi dịch vụ AI bên thứ ba" trong PRD mục 4, quy tắc `json_object` trong `CLAUDE.md`
-- [ ] Cách thay `make` (mục 5.1)
-- [ ] Đổi tên mặc định DB `app` / bucket `lectures` thành `stugen`?
-- [ ] Domain/VPS triển khai thật; ngày bắt đầu chạy kế hoạch; có thêm người đóng góp không
+- [x] Repo public, giấy phép AGPL-3.0 (ADR-0016)
+- [x] Cập nhật tài liệu cho DeepSeek (ADR-0016)
+- [x] Dùng `just` thay `make` (ADR-0016)
+- [x] Đổi tên DB/bucket thành `stugen` (ADR-0016)
+- [ ] Domain/VPS triển khai thật; có thêm người đóng góp không

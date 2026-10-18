@@ -10,6 +10,7 @@
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-Python%203.12-009688?logo=fastapi&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
   <img alt="Docker" src="https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white">
+  <img alt="License" src="https://img.shields.io/badge/license-AGPL--3.0-green">
 </p>
 
 ---
@@ -53,7 +54,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 |---|---|
 | Frontend | Next.js (App Router), TypeScript, Tailwind CSS, shadcn/ui, TanStack Query, Reveal.js, react-pdf, KaTeX |
 | Backend API | Python 3.12, FastAPI, SQLAlchemy 2.0, Alembic, Authlib (Google OAuth) |
-| AI Worker | Celery, PyMuPDF, python-pptx, Pydantic, LLM API (Anthropic / OpenAI / Ollama) |
+| AI Worker | Celery, PyMuPDF, python-pptx, Pydantic, LLM API (mặc định DeepSeek; Anthropic / OpenAI / Ollama) |
 | Hạ tầng | PostgreSQL 16, Redis 7, MinIO, Caddy, Docker Compose |
 
 ## Tài liệu
@@ -61,7 +62,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 | Tài liệu | Nội dung |
 |---|---|
 | [PRD](docs/product/PRD.md) | Sản phẩm làm gì, phạm vi, chức năng, tiêu chí hoàn thành |
-| [ADR](docs/adr/README.md) | 15 quyết định kiến trúc và lý do lựa chọn |
+| [ADR](docs/adr/README.md) | 16 quyết định kiến trúc và lý do lựa chọn |
 | [Mô hình dữ liệu](docs/design/data-model.md) | ERD, chi tiết bảng, cấu trúc JSONB, vòng đời trạng thái, DDL |
 | [Tài liệu API](docs/design/api.md) | Hợp đồng REST giữa frontend và backend, mã lỗi |
 | [Tiến độ](docs/progress.md) | Đã làm gì, việc tiếp theo, vấn đề mở – đọc đầu tiên khi tiếp tục dự án |
@@ -76,6 +77,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 Stugen/
 ├── README.md
 ├── CLAUDE.md                  # Hướng dẫn cho Claude Code
+├── LICENSE                    # AGPL-3.0
 ├── .env.example               # Mẫu biến môi trường
 ├── scripts/
 │   └── make_sample_pdfs.py    # Sinh PDF mẫu để thử pipeline
@@ -89,26 +91,26 @@ Stugen/
     ├── adr/                   # Architecture Decision Records
     │   ├── README.md          # Mục lục ADR
     │   ├── template.md        # Mẫu ADR mới
-    │   └── 0001 … 0015-*.md
+    │   └── 0001 … 0016-*.md
     └── plans/
         └── plan-1-ngay.md     # Kế hoạch phát triển
 ```
 
-Khi bắt đầu viết code, repository sẽ có thêm `frontend/`, `backend/`, `docker-compose.yml`, `Caddyfile` và `Makefile` (xem [CLAUDE.md](CLAUDE.md)).
+Khi bắt đầu viết code, repository sẽ có thêm `frontend/`, `backend/`, `docker-compose.yml`, `Caddyfile` và `justfile` (xem [CLAUDE.md](CLAUDE.md)).
 
 ## Chạy dự án *(sau khi có mã nguồn)*
 
 ```bash
 cp .env.example .env      # điền Google OAuth, LLM API key, mật khẩu DB/MinIO
-make up                   # docker compose up -d --build
-make migrate              # alembic upgrade head
+just up                   # docker compose up -d --build
+just migrate              # alembic upgrade head
 ```
 
 - Ứng dụng: <http://localhost>
 - Tài liệu API (OpenAPI): <http://localhost/api/docs>
 - MinIO console: <http://localhost:9001>
 
-Yêu cầu: Docker Desktop, Node 22, Python 3.12, OAuth Client trên Google Cloud Console với redirect URI `http://localhost/api/auth/google/callback`.
+Yêu cầu: Docker Desktop, Node 22, [`just`](https://github.com/casey/just) (`winget install Casey.Just`), API key LLM (mặc định [DeepSeek](https://platform.deepseek.com)), OAuth Client trên Google Cloud Console với redirect URI `http://localhost/api/auth/google/callback`.
 
 ## Quy ước
 
@@ -121,11 +123,11 @@ Yêu cầu: Docker Desktop, Node 22, Python 3.12, OAuth Client trên Google Clou
 
 | Tài liệu | Phiên bản | Ngày |
 |---|---|---|
-| PRD | 2.2 | 18/10/2026 |
-| ADR | 0001–0015 | 18/10/2026 |
-| Mô hình dữ liệu | 1.1 | 18/10/2026 |
-| Tài liệu API | 1.0 | 18/10/2026 |
+| PRD | 2.3 | 19/10/2026 |
+| ADR | 0001–0016 | 19/10/2026 |
+| Mô hình dữ liệu | 1.2 | 19/10/2026 |
+| Tài liệu API | 1.0 | 19/10/2026 |
 
 ## Giấy phép
 
-Chưa chọn giấy phép. Lưu ý: PyMuPDF dùng giấy phép **AGPL** (xem [ADR-0009](docs/adr/0009-trich-xuat-pdf-pymupdf.md)).
+[GNU AGPL-3.0](LICENSE). Chọn AGPL vì PyMuPDF dùng giấy phép AGPL (xem [ADR-0009](docs/adr/0009-trich-xuat-pdf-pymupdf.md), [ADR-0016](docs/adr/0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md)).

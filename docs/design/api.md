@@ -1,6 +1,6 @@
 # Tài liệu API
 
-> Dựa trên [PRD v2.2](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 18/10/2026
+> Dựa trên [PRD v2.3](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 19/10/2026
 
 ## 1. Quy ước chung
 
@@ -505,7 +505,7 @@ Xem lại chi tiết một lần làm bài.
 
 Không viết tay. Sinh từ OpenAPI (ADR-0003) khi hệ thống đang chạy:
 ```bash
-make gen-api
+just gen-api
 # = cd frontend && npm run gen:api
 # = openapi-typescript http://localhost/api/openapi.json -o src/lib/api-types.ts
 ```

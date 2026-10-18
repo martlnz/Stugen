@@ -1,6 +1,6 @@
 # ADR-0007: Lưu trữ file bằng MinIO (S3-compatible)
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0016](0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md)
 - **Ngày:** 2026-10-18
 
 ## Bối cảnh

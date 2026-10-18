@@ -24,3 +24,6 @@ out/
 # Dữ liệu cục bộ
 data/
 *.log
+
+# PDF mẫu sinh bằng scripts/make_sample_pdfs.py
+samples/

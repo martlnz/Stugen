@@ -32,8 +32,8 @@ export default function HomePage() {
           Biến giáo trình PDF thành tóm tắt, slide và quiz ôn tập
         </h1>
         <p className="max-w-2xl text-lg text-muted-foreground">
-          Tải giáo trình lên, AI đọc theo từng chương và tạo học liệu cho bạn. Mọi bài giảng
-          được lưu trong thư viện cá nhân để xem lại bất cứ lúc nào.
+          Tải giáo trình lên, AI đọc theo từng chương và tạo học liệu cho bạn. Mọi bài giảng được
+          lưu trong thư viện cá nhân để xem lại bất cứ lúc nào.
         </p>
         <Suspense>
           <LoginErrorNotice />
@@ -52,8 +52,8 @@ export default function HomePage() {
       </section>
 
       <p className="text-xs text-muted-foreground">
-        Dự án phi thương mại, mã nguồn mở (AGPL-3.0). Nội dung do AI tạo, nên đối chiếu với
-        giáo trình.
+        Dự án phi thương mại, mã nguồn mở (AGPL-3.0). Nội dung do AI tạo, nên đối chiếu với giáo
+        trình.
       </p>
     </main>
   );

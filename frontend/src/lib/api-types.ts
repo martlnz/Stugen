@@ -4,289 +4,1424 @@
  */
 
 export interface paths {
-    "/api/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Health */
-        get: operations["health_api_health_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+  "/api/health": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/auth/google/login": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Google Login */
-        get: operations["google_login_api_auth_google_login_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Health */
+    get: operations["health_api_health_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/google/login": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/auth/google/callback": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Google Callback */
-        get: operations["google_callback_api_auth_google_callback_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Google Login */
+    get: operations["google_login_api_auth_google_login_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/google/callback": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/auth/logout": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Logout */
-        post: operations["logout_api_auth_logout_post"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    /** Google Callback */
+    get: operations["google_callback_api_auth_google_callback_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/auth/logout": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    "/api/me": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Me */
-        get: operations["me_api_me_get"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
+    get?: never;
+    put?: never;
+    /** Logout */
+    post: operations["logout_api_auth_logout_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/me": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    /** Me */
+    get: operations["me_api_me_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Lectures */
+    get: operations["list_lectures_api_lectures_get"];
+    put?: never;
+    /** Upload Lecture */
+    post: operations["upload_lecture_api_lectures_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Lecture */
+    get: operations["get_lecture_api_lectures__lecture_id__get"];
+    put?: never;
+    post?: never;
+    /** Delete Lecture */
+    delete: operations["delete_lecture_api_lectures__lecture_id__delete"];
+    options?: never;
+    head?: never;
+    /** Update Lecture */
+    patch: operations["update_lecture_api_lectures__lecture_id__patch"];
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/retry": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retry Lecture */
+    post: operations["retry_lecture_api_lectures__lecture_id__retry_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/pdf": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Pdf */
+    get: operations["get_pdf_api_lectures__lecture_id__pdf_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Summary */
+    get: operations["get_summary_api_lectures__lecture_id__summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/slides": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Slides */
+    get: operations["get_slides_api_lectures__lecture_id__slides_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/slides.pptx": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download Pptx */
+    get: operations["download_pptx_api_lectures__lecture_id__slides_pptx_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lectures/{lecture_id}/quizzes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Quizzes */
+    get: operations["list_quizzes_api_lectures__lecture_id__quizzes_get"];
+    put?: never;
+    /** Create Quiz */
+    post: operations["create_quiz_api_lectures__lecture_id__quizzes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quizzes/{quiz_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Quiz */
+    get: operations["get_quiz_api_quizzes__quiz_id__get"];
+    put?: never;
+    post?: never;
+    /** Delete Quiz */
+    delete: operations["delete_quiz_api_quizzes__quiz_id__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/quizzes/{quiz_id}/attempts": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Attempts */
+    get: operations["list_attempts_api_quizzes__quiz_id__attempts_get"];
+    put?: never;
+    /** Submit Attempt */
+    post: operations["submit_attempt_api_quizzes__quiz_id__attempts_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/attempts/{attempt_id}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Attempt */
+    get: operations["get_attempt_api_attempts__attempt_id__get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
-    schemas: {
-        /** HTTPValidationError */
-        HTTPValidationError: {
-            /** Detail */
-            detail?: components["schemas"]["ValidationError"][];
-        };
-        /** HealthOut */
-        HealthOut: {
-            /**
-             * Status
-             * @enum {string}
-             */
-            status: "ok" | "error";
-            /**
-             * Db
-             * @enum {string}
-             */
-            db: "ok" | "error";
-            /**
-             * Redis
-             * @enum {string}
-             */
-            redis: "ok" | "error";
-        };
-        /** MeOut */
-        MeOut: {
-            /**
-             * Id
-             * Format: uuid
-             */
-            id: string;
-            /** Email */
-            email: string;
-            /** Name */
-            name: string;
-            /** Avatar Url */
-            avatar_url: string | null;
-            /**
-             * Created At
-             * Format: date-time
-             */
-            created_at: string;
-        };
-        /** ValidationError */
-        ValidationError: {
-            /** Location */
-            loc: (string | number)[];
-            /** Message */
-            msg: string;
-            /** Error Type */
-            type: string;
-            /** Input */
-            input?: unknown;
-            /** Context */
-            ctx?: Record<string, never>;
-        };
+  schemas: {
+    /** AttemptCreate */
+    AttemptCreate: {
+      /**
+       * Answers
+       * @description question_id → chỉ số lựa chọn 0–3, null = bỏ trống
+       */
+      answers?: {
+        [key: string]: number | null;
+      };
     };
-    responses: never;
-    parameters: never;
-    requestBodies: never;
-    headers: never;
-    pathItems: never;
+    /** AttemptListItem */
+    AttemptListItem: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Score */
+      score: number;
+      /** Total */
+      total: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** AttemptPage */
+    AttemptPage: {
+      /** Items */
+      items: components["schemas"]["AttemptListItem"][];
+      /** Page */
+      page: number;
+      /** Page Size */
+      page_size: number;
+      /** Total */
+      total: number;
+    };
+    /** AttemptResult */
+    AttemptResult: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Quiz Id
+       * Format: uuid
+       */
+      quiz_id: string;
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      /** Lecture Title */
+      lecture_title: string;
+      /** Score */
+      score: number;
+      /** Total */
+      total: number;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /** Results */
+      results: components["schemas"]["QuestionResult"][];
+      /** By Chapter */
+      by_chapter: components["schemas"]["ChapterScore"][];
+    };
+    /** Body_upload_lecture_api_lectures_post */
+    Body_upload_lecture_api_lectures_post: {
+      /**
+       * File
+       * @description PDF ≤ 20 MB, ≤ 200 trang
+       */
+      file: string;
+      /** Title */
+      title?: string | null;
+    };
+    /** ChapterScore */
+    ChapterScore: {
+      /** Chapter Idx */
+      chapter_idx: number;
+      /** Title */
+      title: string;
+      /** Correct */
+      correct: number;
+      /** Total */
+      total: number;
+    };
+    /**
+     * ChapterSummary
+     * @description Lưu ở summaries.chapters; idx/title/page_* do code ghép từ bảng chapters.
+     */
+    ChapterSummary: {
+      /**
+       * Key Points
+       * @description Ý chính của chương, mỗi ý một câu hoàn chỉnh
+       */
+      key_points: string[];
+      /** Terms */
+      terms?: components["schemas"]["Term"][];
+      /** Idx */
+      idx: number;
+      /** Title */
+      title: string;
+      /** Page Start */
+      page_start: number;
+      /** Page End */
+      page_end: number;
+    };
+    /** HTTPValidationError */
+    HTTPValidationError: {
+      /** Detail */
+      detail?: components["schemas"]["ValidationError"][];
+    };
+    /** HealthOut */
+    HealthOut: {
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "ok" | "error";
+      /**
+       * Db
+       * @enum {string}
+       */
+      db: "ok" | "error";
+      /**
+       * Redis
+       * @enum {string}
+       */
+      redis: "ok" | "error";
+    };
+    /** LectureAvailable */
+    LectureAvailable: {
+      /**
+       * Summary
+       * @default false
+       */
+      summary: boolean;
+      /**
+       * Slides
+       * @default false
+       */
+      slides: boolean;
+      /**
+       * Pptx
+       * @default false
+       */
+      pptx: boolean;
+      /**
+       * Quiz
+       * @default false
+       */
+      quiz: boolean;
+    };
+    /** LectureError */
+    LectureError: {
+      /** Code */
+      code: string;
+      /** Message */
+      message: string;
+    };
+    /** LectureOut */
+    LectureOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Title */
+      title: string;
+      /** Original Filename */
+      original_filename: string;
+      /** File Size */
+      file_size: number;
+      /** Page Count */
+      page_count: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "queued" | "processing" | "completed" | "failed";
+      /** Progress Step */
+      progress_step: ("extracting" | "summarizing" | "slides" | "quiz") | null;
+      error: components["schemas"]["LectureError"] | null;
+      available: components["schemas"]["LectureAvailable"];
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+      /**
+       * Updated At
+       * Format: date-time
+       */
+      updated_at: string;
+      /** Completed At */
+      completed_at: string | null;
+    };
+    /** LecturePage */
+    LecturePage: {
+      /** Items */
+      items: components["schemas"]["LectureOut"][];
+      /** Page */
+      page: number;
+      /** Page Size */
+      page_size: number;
+      /** Total */
+      total: number;
+    };
+    /** LectureUpdate */
+    LectureUpdate: {
+      /** Title */
+      title: string;
+    };
+    /** MeOut */
+    MeOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Email */
+      email: string;
+      /** Name */
+      name: string;
+      /** Avatar Url */
+      avatar_url: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /**
+     * QuestionPublic
+     * @description Câu hỏi khi làm bài: KHÔNG có answer_index và explanation (ADR-0012).
+     */
+    QuestionPublic: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Position */
+      position: number;
+      /** Question */
+      question: string;
+      /** Options */
+      options: string[];
+      /** Page Ref */
+      page_ref: number;
+    };
+    /** QuestionResult */
+    QuestionResult: {
+      /**
+       * Question Id
+       * Format: uuid
+       */
+      question_id: string;
+      /** Position */
+      position: number;
+      /** Question */
+      question: string;
+      /** Options */
+      options: string[];
+      /** Selected Index */
+      selected_index: number | null;
+      /** Correct Index */
+      correct_index: number;
+      /** Is Correct */
+      is_correct: boolean;
+      /** Explanation */
+      explanation: string;
+      /** Page Ref */
+      page_ref: number;
+    };
+    /** QuizCreate */
+    QuizCreate: {
+      /**
+       * Num Questions
+       * @default 10
+       * @enum {integer}
+       */
+      num_questions: 10 | 20 | 30;
+    };
+    /** QuizDetail */
+    QuizDetail: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      /** Lecture Title */
+      lecture_title: string;
+      /** Num Questions */
+      num_questions: number;
+      /** Questions */
+      questions: components["schemas"]["QuestionPublic"][];
+    };
+    /** QuizList */
+    QuizList: {
+      /** Items */
+      items: components["schemas"]["QuizSummary"][];
+    };
+    /** QuizSummary */
+    QuizSummary: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "queued" | "processing" | "completed" | "failed";
+      /** Num Questions */
+      num_questions: number;
+      /** Is Default */
+      is_default: boolean;
+      error: components["schemas"]["LectureError"] | null;
+      /** Attempt Count */
+      attempt_count: number;
+      /** Best Score */
+      best_score: number | null;
+      /** Last Attempt At */
+      last_attempt_at: string | null;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** Slide */
+    Slide: {
+      /**
+       * Layout
+       * @enum {string}
+       */
+      layout: "title" | "agenda" | "section" | "bullets" | "summary";
+      /** Title */
+      title: string;
+      /** Subtitle */
+      subtitle?: string | null;
+      /** Bullets */
+      bullets?: string[];
+      /** Notes */
+      notes?: string | null;
+      /** Page Refs */
+      page_refs?: number[];
+    };
+    /** SlideDeck */
+    SlideDeck: {
+      /**
+       * Version
+       * @default 1
+       * @constant
+       */
+      version: 1;
+      /** Title */
+      title: string;
+      /** Slides */
+      slides: components["schemas"]["Slide"][];
+    };
+    /** SlidesOut */
+    SlidesOut: {
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      deck: components["schemas"]["SlideDeck"];
+      /** Pptx Available */
+      pptx_available: boolean;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** SummaryOut */
+    SummaryOut: {
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      /** Overview */
+      overview: string;
+      /** Learning Objectives */
+      learning_objectives: string[];
+      /** Chapters */
+      chapters: components["schemas"]["ChapterSummary"][];
+      /** Content Md */
+      content_md: string;
+      /**
+       * Created At
+       * Format: date-time
+       */
+      created_at: string;
+    };
+    /** Term */
+    Term: {
+      /**
+       * Term
+       * @description Thuật ngữ, giữ nguyên gốc
+       */
+      term: string;
+      /**
+       * Definition
+       * @description Định nghĩa ngắn gọn
+       */
+      definition: string;
+    };
+    /** ValidationError */
+    ValidationError: {
+      /** Location */
+      loc: (string | number)[];
+      /** Message */
+      msg: string;
+      /** Error Type */
+      type: string;
+      /** Input */
+      input?: unknown;
+      /** Context */
+      ctx?: Record<string, never>;
+    };
+  };
+  responses: never;
+  parameters: never;
+  requestBodies: never;
+  headers: never;
+  pathItems: never;
 }
 export type $defs = Record<string, never>;
 export interface operations {
-    health_api_health_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthOut"];
-                };
-            };
-            /** @description Service Unavailable */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HealthOut"];
-                };
-            };
-        };
+  health_api_health_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    google_login_api_auth_google_login_get: {
-        parameters: {
-            query?: {
-                next?: string | null;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content: {
+          "application/json": components["schemas"]["HealthOut"];
         };
+      };
+      /** @description Service Unavailable */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HealthOut"];
+        };
+      };
     };
-    google_callback_api_auth_google_callback_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
+  };
+  google_login_api_auth_google_login_get: {
+    parameters: {
+      query?: {
+        next?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
-    logout_api_auth_logout_post: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      302: {
+        headers: {
+          [name: string]: unknown;
         };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
         };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
     };
-    me_api_me_get: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Successful Response */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["MeOut"];
-                };
-            };
-            /** @description Validation Error */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["HTTPValidationError"];
-                };
-            };
-        };
+  };
+  google_callback_api_auth_google_callback_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
     };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      302: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+    };
+  };
+  logout_api_auth_logout_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  me_api_me_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["MeOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_lectures_api_lectures_get: {
+    parameters: {
+      query?: {
+        q?: string | null;
+        status?: ("queued" | "processing" | "completed" | "failed") | null;
+        sort?: "-created_at" | "created_at" | "title" | "-title";
+        page?: number;
+        page_size?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LecturePage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  upload_lecture_api_lectures_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_upload_lecture_api_lectures_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LectureOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_lecture_api_lectures__lecture_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LectureOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_lecture_api_lectures__lecture_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  update_lecture_api_lectures__lecture_id__patch: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LectureUpdate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LectureOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  retry_lecture_api_lectures__lecture_id__retry_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LectureOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_pdf_api_lectures__lecture_id__pdf_get: {
+    parameters: {
+      query?: {
+        download?: boolean;
+      };
+      header?: {
+        Range?: string | null;
+      };
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/pdf": unknown;
+        };
+      };
+      /** @description Partial */
+      206: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_summary_api_lectures__lecture_id__summary_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SummaryOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_slides_api_lectures__lecture_id__slides_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["SlidesOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  download_pptx_api_lectures__lecture_id__slides_pptx_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_quizzes_api_lectures__lecture_id__quizzes_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["QuizList"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_quiz_api_lectures__lecture_id__quizzes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["QuizCreate"] | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["QuizSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_quiz_api_quizzes__quiz_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        quiz_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["QuizDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  delete_quiz_api_quizzes__quiz_id__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        quiz_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_attempts_api_quizzes__quiz_id__attempts_get: {
+    parameters: {
+      query?: {
+        page?: number;
+        page_size?: number;
+      };
+      header?: never;
+      path: {
+        quiz_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttemptPage"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  submit_attempt_api_quizzes__quiz_id__attempts_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        quiz_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AttemptCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttemptResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_attempt_api_attempts__attempt_id__get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        attempt_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["AttemptResult"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
 }

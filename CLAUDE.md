@@ -28,6 +28,7 @@ backend/app/
 backend/alembic/     migrations
 docs/                product/ (PRD), design/ (API, data model), adr/, plans/
 docker-compose.yml   proxy, web, api, worker, postgres, redis, minio
+                     (beat: thêm khi làm cleanup_orphans – ADR-0014)
 Caddyfile
 ```
 
@@ -42,7 +43,8 @@ make revision m="mô tả"   # alembic revision --autogenerate
 make test        # pytest backend
 make lint        # ruff check + ruff format --check + (frontend) eslint, tsc
 make fmt         # ruff format + prettier
-make gen-api     # sinh frontend/src/lib/api-types.ts từ /api/openapi.json
+make gen-api     # = cd frontend && npm run gen:api → openapi-typescript http://localhost/api/openapi.json
+                 #   -o src/lib/api-types.ts (FastAPI: openapi_url=/api/openapi.json, docs_url=/api/docs)
 ```
 
 Ứng dụng chạy tại `http://localhost`, tài liệu API tại `http://localhost/api/docs`.
@@ -61,9 +63,12 @@ make gen-api     # sinh frontend/src/lib/api-types.ts từ /api/openapi.json
 - Frontend chỉ nói chuyện với FastAPI; không truy cập DB, MinIO trực tiếp.
 - Tác vụ chậm (PDF, LLM, PPTX) chạy trong Celery worker, không chạy trong request.
 - Mọi lời gọi LLM đi qua `LLMClient` trong `app/ai/llm/`; không import SDK nhà cung cấp ở nơi khác.
-- Đầu ra LLM luôn validate bằng Pydantic trước khi ghi DB; lỗi → thử lại 1 lần kèm thông báo lỗi.
+- Đầu ra LLM luôn validate bằng Pydantic trước khi ghi DB; sai định dạng → sửa 1 lần kèm thông báo lỗi (ADR-0015).
+- Lỗi tạm thời của LLM (timeout, 429, 5xx) → thử lại 2 lần có backoff ngay trong `LLMClient`; Celery chỉ retry task cho lỗi hạ tầng (DB, Redis, MinIO).
+- Code sinh slide `title`, `agenda`, `section`, `summary`; LLM chỉ sinh slide `bullets` từng chương. LLM không trả số trang chương.
 - Prompt nằm trong `app/ai/prompts/*.j2`, không viết prompt dài inline trong code.
-- Task worker phải idempotent: kiểm tra kết quả đã có trước khi chạy lại bước.
+- Task worker phải idempotent: kiểm tra kết quả đã có trước khi chạy lại bước. Kết quả LLM từng chương ghi ngay vào `chapters.summary` / `chapters.slides`; chương đã có giá trị thì bỏ qua.
+- Prompt sinh nội dung theo `CONTENT_LANGUAGE` (mặc định `vi`: tiếng Việt, thuật ngữ giữ nguyên gốc kèm giải nghĩa).
 - Thay đổi lược đồ → tạo migration Alembic, không sửa migration đã có.
 
 **Tài liệu**

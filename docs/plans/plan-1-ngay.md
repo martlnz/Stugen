@@ -72,7 +72,8 @@
 - `ai/pdf.py`: PyMuPDF, chuẩn hoá NFC, đánh dấu `[[trang N]]`, chia chương theo bookmark → fallback chia đều 15 trang; phát hiện PDF scan.
 - `ai/llm/`: `LLMClient` + một provider (theo key bạn có) + `FakeLLMClient`.
 - Prompt `chapter_summary_v1.j2`, `overview_v1.j2`; generator tóm tắt (song song tối đa `LLM_MAX_CONCURRENCY`), lắp `content_md`.
-- `process_lecture`: cập nhật `progress_step`, ghi `chapters`, `summaries`; lỗi → `failed` + `error_code`.
+- `process_lecture`: cập nhật `progress_step`, ghi `chapters`; mỗi chương tóm tắt xong ghi ngay `chapters.summary` (bỏ qua chương đã có), rồi lắp ráp `summaries`; lỗi → `failed` + `error_code`.
+- `LLMClient`: thử lại lỗi tạm thời 2 lần (SDK `max_retries`), sửa đầu ra sai 1 lần (ADR-0015).
 - `GET /lectures/{id}/summary`; trường `available` trong `Lecture`.
 - Frontend: `/lectures/[id]` với tab, polling 3 giây, thanh tiến trình các bước, tab Tóm tắt (react-markdown + KaTeX) và tab PDF gốc.
 
@@ -82,7 +83,7 @@
 
 ### Khối 5 · 14:15–15:30 · Slide
 
-- Schema `SlideDeck` (ADR-0011), prompt `slides_v1.j2`, slide tiêu đề/mục lục/tổng kết sinh bằng code.
+- Schema `SlideDeck` (ADR-0011), prompt `slides_v1.j2`. Code sinh slide `title`, `agenda`, `section` và `summary` (từ `learning_objectives`); LLM chỉ sinh 1–3 slide `bullets` mỗi chương từ `chapters.summary`, ghi ngay vào `chapters.slides` (ADR-0015).
 - python-pptx: template đơn giản, ghi speaker notes, lưu `slides.pptx` lên MinIO.
 - `GET /lectures/{id}/slides`, `GET /lectures/{id}/slides.pptx`.
 - Frontend: tab Slide với Reveal.js, nút toàn màn hình, nút tải PPTX.

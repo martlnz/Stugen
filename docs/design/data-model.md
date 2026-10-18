@@ -1,6 +1,8 @@
 # Mô hình dữ liệu
 
-> Dựa trên [PRD v2.1](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012 · Cập nhật 18/10/2026
+> Phiên bản 1.1 · Dựa trên [PRD v2.2](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015 · Cập nhật 18/10/2026
+>
+> Đây là **nguồn chuẩn** cho lược đồ CSDL; lược đồ trong ADR-0006 chỉ là bản phác thảo.
 
 ## 1. Tổng quan
 
@@ -67,6 +69,8 @@ erDiagram
         int page_end
         text text
         int char_count
+        jsonb summary
+        jsonb slides
     }
     summaries {
         uuid id PK
@@ -193,8 +197,12 @@ Kết quả trích xuất PDF đã chia chương (ADR-0009). Dùng lại khi sin
 | `page_end` | INT | NOT NULL, ≥ page_start | |
 | `text` | TEXT | NOT NULL | Có đánh dấu `[[trang N]]` |
 | `char_count` | INT | NOT NULL | Dùng để phân bổ số câu hỏi |
+| `summary` | JSONB | NULL | `ChapterSummaryLLM` của chương, ghi ngay khi xong (ADR-0015) |
+| `slides` | JSONB | NULL | Danh sách slide `bullets` của chương, ghi ngay khi xong (ADR-0015) |
 
 Unique: `(lecture_id, idx)`.
+
+`summary` và `slides` là kết quả trung gian để chạy lại không gọi lại LLM cho chương đã xong: chương nào đã có giá trị thì bỏ qua. Khi đủ các chương, code lắp ráp `summaries` và `slide_decks` từ hai cột này.
 
 ### 3.5 `summaries`
 Tóm tắt của một bài giảng (1–1).
@@ -204,7 +212,7 @@ Tóm tắt của một bài giảng (1–1).
 | `id` | UUID | PK | |
 | `lecture_id` | UUID | FK → lectures, CASCADE, UNIQUE | |
 | `overview` | TEXT | NOT NULL | Đoạn tổng quan |
-| `learning_objectives` | JSONB | NOT NULL | `string[]` |
+| `learning_objectives` | JSONB | NOT NULL | `string[]`, tối đa 6 mục, mỗi mục ≤ 120 ký tự (dùng làm slide tổng kết) |
 | `chapters` | JSONB | NOT NULL | `ChapterSummary[]`, xem 4.1 |
 | `content_md` | TEXT | NOT NULL | Markdown lắp ráp từ các trường trên |
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
@@ -283,6 +291,9 @@ Nhật ký gọi LLM để theo dõi chi phí (ADR-0010). Không lộ qua API.
 ## 4. Cấu trúc JSONB
 
 ### 4.1 `summaries.chapters` – `ChapterSummary[]`
+
+LLM chỉ sinh `key_points` (1–8 mục) và `terms` (≤ 10 mục) – lưu ở `chapters.summary`. Các trường `idx`, `title`, `page_start`, `page_end` do code ghép từ bảng `chapters` (ADR-0015), LLM không trả số trang chương.
+
 ```json
 [
   {
@@ -454,6 +465,8 @@ CREATE TABLE chapters (
   page_end   INT NOT NULL CHECK (page_end >= page_start),
   text       TEXT NOT NULL,
   char_count INT NOT NULL,
+  summary    JSONB,
+  slides     JSONB,
   UNIQUE (lecture_id, idx)
 );
 

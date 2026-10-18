@@ -2,6 +2,7 @@
 
 - **Trạng thái:** Chấp nhận
 - **Ngày:** 2026-10-18
+- **Ghi chú:** Lược đồ dưới đây là bản phác thảo tại thời điểm quyết định. Lược đồ chi tiết, cập nhật: [data-model.md](../design/data-model.md).
 
 ## Bối cảnh
 Dữ liệu có quan hệ rõ ràng (user → lecture → summary/slides/quiz → question/attempt), kèm một số dữ liệu bán cấu trúc (danh sách slide, lựa chọn đáp án).

@@ -1,6 +1,6 @@
 # ADR-0008: Xử lý bất đồng bộ bằng Celery + Redis
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0015](0015-lam-ro-pipeline-llm.md)
 - **Ngày:** 2026-10-18
 
 ## Bối cảnh

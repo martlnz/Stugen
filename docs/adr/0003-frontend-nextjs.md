@@ -2,6 +2,7 @@
 
 - **Trạng thái:** Chấp nhận
 - **Ngày:** 2026-10-18
+- **Ghi chú:** Lệnh sinh kiểu API chuẩn là `make gen-api` (xem `CLAUDE.md`), lấy schema từ `http://localhost/api/openapi.json`.
 
 ## Bối cảnh
 PRD cho phép chọn công nghệ frontend tốt nhất. Giao diện cần: danh sách thư viện, upload kéo-thả, hiển thị Markdown + công thức toán, trình chiếu slide, làm quiz; chạy tốt trên mobile.

@@ -1,6 +1,6 @@
 # Tài liệu API
 
-> Dựa trên [PRD v2.1](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 18/10/2026
+> Dựa trên [PRD v2.2](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 18/10/2026
 
 ## 1. Quy ước chung
 
@@ -503,7 +503,9 @@ Xem lại chi tiết một lần làm bài.
 
 ## 11. Kiểu TypeScript cho frontend
 
-Không viết tay. Sinh từ OpenAPI (ADR-0003):
+Không viết tay. Sinh từ OpenAPI (ADR-0003) khi hệ thống đang chạy:
 ```bash
-npx openapi-typescript http://localhost/api/openapi.json -o src/lib/api-types.ts
+make gen-api
+# = cd frontend && npm run gen:api
+# = openapi-typescript http://localhost/api/openapi.json -o src/lib/api-types.ts
 ```

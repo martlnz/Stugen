@@ -1,6 +1,6 @@
 # PRD – Stugen: Website tạo học liệu từ giáo trình PDF
 
-> Dự án phi thương mại · Phiên bản 2.1 · 18/10/2026
+> Dự án phi thương mại · Phiên bản 2.2 · 18/10/2026
 >
 > Tài liệu liên quan: [Mô hình dữ liệu](../design/data-model.md) · [Tài liệu API](../design/api.md) · [ADR](../adr/README.md)
 
@@ -44,6 +44,7 @@ Mọi bài giảng đã tạo được lưu theo tài khoản để xem lại sa
 - Mỗi chương: các ý chính và thuật ngữ quan trọng kèm định nghĩa.
 - Có ghi số trang tham chiếu tới PDF gốc.
 - Hiển thị dạng Markdown (hỗ trợ công thức toán bằng KaTeX).
+- Nội dung sinh ra bằng tiếng Việt (mặc định); thuật ngữ chuyên ngành giữ nguyên gốc kèm giải nghĩa, ví dụ "Primary key (khoá chính)". Áp dụng cho cả slide và quiz.
 
 ### 3.4 Slide
 - Gồm: slide tiêu đề, mục lục, các slide nội dung theo chương, slide tổng kết.
@@ -105,11 +106,13 @@ Frontend và API chạy cùng domain qua Caddy. Chi tiết: [ADR-0005](../adr/00
 ### 5.3 Pipeline AI
 1. Backend lưu PDF, tạo bản ghi `lecture` (`processing`), đẩy job vào hàng đợi.
 2. Worker trích xuất văn bản theo trang bằng PyMuPDF, tách chương theo mục lục (bookmark) hoặc tiêu đề; nếu không có thì chia theo số trang.
-3. Sinh tóm tắt từng chương → tổng hợp tóm tắt toàn bài.
-4. Từ tóm tắt sinh cấu trúc slide (JSON) → tạo file PPTX.
+3. Sinh tóm tắt từng chương (lưu ngay sau mỗi chương) → tổng hợp tóm tắt toàn bài.
+4. Từ tóm tắt sinh slide nội dung từng chương (JSON); slide tiêu đề, mục lục, mở chương, tổng kết do code tạo → tạo file PPTX.
 5. Sinh câu hỏi quiz theo từng chương (JSON).
-6. Kiểm tra JSON bằng Pydantic, lỗi thì thử lại tối đa 2 lần.
+6. Đầu ra LLM luôn được kiểm tra bằng Pydantic; chính sách thử lại khi lỗi mạng hoặc sai định dạng xem [ADR-0015](../adr/0015-lam-ro-pipeline-llm.md).
 7. Lưu kết quả, cập nhật `lecture` thành `completed` hoặc `failed`.
+
+Chạy lại một bài giảng lỗi không gọi lại LLM cho các chương đã xong.
 
 ## 6. Dữ liệu
 

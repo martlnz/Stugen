@@ -61,7 +61,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 | Tài liệu | Nội dung |
 |---|---|
 | [PRD](docs/product/PRD.md) | Sản phẩm làm gì, phạm vi, chức năng, tiêu chí hoàn thành |
-| [ADR](docs/adr/README.md) | 14 quyết định kiến trúc và lý do lựa chọn |
+| [ADR](docs/adr/README.md) | 15 quyết định kiến trúc và lý do lựa chọn |
 | [Mô hình dữ liệu](docs/design/data-model.md) | ERD, chi tiết bảng, cấu trúc JSONB, vòng đời trạng thái, DDL |
 | [Tài liệu API](docs/design/api.md) | Hợp đồng REST giữa frontend và backend, mã lỗi |
 | [Kế hoạch 1 ngày](docs/plans/plan-1-ngay.md) | Lịch phát triển MVP theo từng khối |
@@ -85,7 +85,7 @@ Stugen/
     ├── adr/                   # Architecture Decision Records
     │   ├── README.md          # Mục lục ADR
     │   ├── template.md        # Mẫu ADR mới
-    │   └── 0001 … 0014-*.md
+    │   └── 0001 … 0015-*.md
     └── plans/
         └── plan-1-ngay.md     # Kế hoạch phát triển
 ```
@@ -117,9 +117,9 @@ Yêu cầu: Docker Desktop, Node 22, Python 3.12, OAuth Client trên Google Clou
 
 | Tài liệu | Phiên bản | Ngày |
 |---|---|---|
-| PRD | 2.1 | 18/10/2026 |
-| ADR | 0001–0014 | 18/10/2026 |
-| Mô hình dữ liệu | 1.0 | 18/10/2026 |
+| PRD | 2.2 | 18/10/2026 |
+| ADR | 0001–0015 | 18/10/2026 |
+| Mô hình dữ liệu | 1.1 | 18/10/2026 |
 | Tài liệu API | 1.0 | 18/10/2026 |
 
 ## Giấy phép

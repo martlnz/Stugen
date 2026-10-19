@@ -10,36 +10,57 @@ import Reveal from "reveal.js";
 import { InlineMath } from "@/components/markdown";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useSlides, type Slides } from "@/hooks/queries";
+import { useLessonSlides, type LessonSlides } from "@/hooks/queries";
 import { errorMessage } from "@/lib/api";
 
-type Slide = Slides["deck"]["slides"][number];
+type Slide = LessonSlides["deck"]["slides"][number];
 
 function SlideSection({ slide }: { slide: Slide }) {
   const notes = slide.notes ? <aside className="notes">{slide.notes}</aside> : null;
   if (slide.layout === "title" || slide.layout === "section") {
     return (
-      <section data-background-color={slide.layout === "section" ? "#eef3fb" : undefined}>
-        <h2 className="!text-[1.6em]">
+      <section data-background-color="#eef3fb">
+        <h2 className="!text-[1.5em] !normal-case">
           <InlineMath>{slide.title}</InlineMath>
         </h2>
-        {slide.subtitle && <p className="!text-[0.7em] text-neutral-500">{slide.subtitle}</p>}
+        {slide.subtitle && <p className="!text-[0.65em] text-neutral-500">{slide.subtitle}</p>}
         {notes}
       </section>
     );
   }
+  const example = slide.example?.replace(/^Ví dụ minh hoạ:\s*/, "");
+  const illustrative = slide.example?.startsWith("Ví dụ minh hoạ");
   return (
     <section className="!text-left">
-      <h3 className="!text-[1.1em]">
+      <h3 className="!mb-[0.5em] !text-[0.95em] !normal-case">
         <InlineMath>{slide.title}</InlineMath>
       </h3>
-      <ul className="!ml-[1em] !block !text-[0.62em] !leading-snug">
-        {(slide.bullets ?? []).map((b, i) => (
-          <li key={i} className="!mb-[0.45em]">
-            <InlineMath>{b}</InlineMath>
-          </li>
-        ))}
-      </ul>
+      <div className={example ? "grid grid-cols-[1.35fr_1fr] gap-[1.2em]" : ""}>
+        <div>
+          <ul className="!ml-[1em] !block !text-[0.62em] !leading-snug">
+            {(slide.bullets ?? []).map((b, i) => (
+              <li key={i} className="!mb-[0.4em]">
+                <InlineMath>{b}</InlineMath>
+              </li>
+            ))}
+          </ul>
+          {slide.explanation && (
+            <p className="!mt-[0.6em] !text-[0.52em] !leading-snug text-neutral-600 italic">
+              <InlineMath>{slide.explanation}</InlineMath>
+            </p>
+          )}
+        </div>
+        {example && (
+          <div className="self-start rounded-[0.3em] border-l-[0.12em] border-[#2a76dd] bg-[#eef3fb] p-[0.6em] !text-[0.52em] !leading-snug">
+            <p className="!m-0 !mb-[0.3em] font-semibold text-[#1f4e79]">
+              {illustrative ? "Ví dụ minh hoạ" : "Ví dụ"}
+            </p>
+            <p className="!m-0">
+              <InlineMath>{example}</InlineMath>
+            </p>
+          </div>
+        )}
+      </div>
       {slide.page_refs && slide.page_refs.length > 0 && (
         <p className="!mt-[0.8em] !text-[0.45em] text-neutral-500">
           Trang {slide.page_refs.join(", ")}
@@ -64,9 +85,9 @@ function Deck({ slides }: { slides: Slide[] }) {
       progress: true,
       slideNumber: "c/t",
       keyboardCondition: "focused",
-      width: 1280,
-      height: 720,
-      margin: 0.06,
+      width: 1024,
+      height: 576,
+      margin: 0.05,
       transition: "slide",
     });
     void deck.initialize();
@@ -94,8 +115,8 @@ function Deck({ slides }: { slides: Slide[] }) {
   );
 }
 
-export function SlidesTab({ lectureId, title }: { lectureId: string; title: string }) {
-  const { data, isPending, error } = useSlides(lectureId, true);
+export function SlidesTab({ lessonId, title }: { lessonId: string; title: string }) {
+  const { data, isPending, error } = useLessonSlides(lessonId, true);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
   if (isPending) return <Skeleton className="aspect-video w-full" />;
@@ -116,7 +137,7 @@ export function SlidesTab({ lectureId, title }: { lectureId: string; title: stri
         </Button>
         {data.pptx_available ? (
           <a
-            href={`/api/lectures/${lectureId}/slides.pptx`}
+            href={`/api/lessons/${lessonId}/slides.pptx`}
             download={`${title}.pptx`}
             className={buttonVariants({ size: "sm" })}
           >

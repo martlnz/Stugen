@@ -42,7 +42,10 @@ export default function QuizPage() {
     onSuccess: (result) => {
       qc.setQueryData(keys.attempt(result.id), result);
       void qc.invalidateQueries({ queryKey: keys.attempts(id) });
-      void qc.invalidateQueries({ queryKey: keys.quizzes(result.lecture_id) });
+      void qc.invalidateQueries({ queryKey: keys.lectureQuizzes(result.lecture_id) });
+      if (result.lesson_id) {
+        void qc.invalidateQueries({ queryKey: keys.lessonQuizzes(result.lesson_id) });
+      }
       router.push(`/attempts/${result.id}`);
     },
   });
@@ -64,6 +67,9 @@ export default function QuizPage() {
   }
 
   const questions = quiz.questions;
+  const lectureLink = quiz.lesson_id
+    ? `/lectures/${quiz.lecture_id}?lesson=${quiz.lesson_id}&tab=quiz`
+    : `/lectures/${quiz.lecture_id}?tab=scope`;
   const question = questions[index];
   const answered = Object.keys(answers).length;
   const unanswered = questions.length - answered;
@@ -72,11 +78,12 @@ export default function QuizPage() {
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="space-y-2">
         <Link
-          href={`/lectures/${quiz.lecture_id}?tab=quiz`}
+          href={lectureLink}
           className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="size-4" /> {quiz.lecture_title}
         </Link>
+        <h1 className="text-lg font-semibold">{quiz.scope_title}</h1>
         <div className="flex items-center justify-between text-sm">
           <span className="font-medium">
             Câu {index + 1}/{questions.length}
@@ -186,10 +193,7 @@ export default function QuizPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      <Link
-        href={`/lectures/${quiz.lecture_id}?tab=quiz`}
-        className={buttonVariants({ variant: "link", className: "px-0" })}
-      >
+      <Link href={lectureLink} className={buttonVariants({ variant: "link", className: "px-0" })}>
         Thoát, không lưu
       </Link>
     </div>

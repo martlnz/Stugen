@@ -12,7 +12,7 @@ export const STATUS_LABEL: Record<LectureStatus, string> = {
 };
 
 export const STEPS: { key: ProgressStep; label: string }[] = [
-  { key: "extracting", label: "Đang trích xuất" },
+  { key: "extracting", label: "Đang tách mục lục" },
   { key: "summarizing", label: "Đang tóm tắt" },
   { key: "slides", label: "Đang tạo slide" },
   { key: "quiz", label: "Đang tạo quiz" },
@@ -41,4 +41,19 @@ export function formatBytes(bytes: number): string {
 
 export function pageRange(start: number, end: number): string {
   return start === end ? `trang ${start}` : `trang ${start}–${end}`;
+}
+
+export function pagesLabel(start: number, end: number): string {
+  return start === end ? `tr. ${start}` : `tr. ${start}–${end}`;
+}
+
+const LESSON_STEP: Record<string, string> = {
+  summarizing: "Đang tóm tắt…",
+  slides: "Đang tạo slide…",
+  quiz: "Đang tạo quiz…",
+};
+
+export function lessonStepLabel(status: string, step: string | null | undefined): string {
+  if (status === "queued") return "Đang chờ tạo…";
+  return (step && LESSON_STEP[step]) || "Đang tạo…";
 }

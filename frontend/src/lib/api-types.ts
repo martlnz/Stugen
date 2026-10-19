@@ -160,15 +160,15 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/lectures/{lecture_id}/summary": {
+  "/api/lectures/{lecture_id}/outline": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get Summary */
-    get: operations["get_summary_api_lectures__lecture_id__summary_get"];
+    /** Get Outline */
+    get: operations["get_outline_api_lectures__lecture_id__outline_get"];
     put?: never;
     post?: never;
     delete?: never;
@@ -177,34 +177,34 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/lectures/{lecture_id}/slides": {
+  "/api/lectures/{lecture_id}/lessons/generate": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Get Slides */
-    get: operations["get_slides_api_lectures__lecture_id__slides_get"];
+    get?: never;
     put?: never;
-    post?: never;
+    /** Generate Lessons */
+    post: operations["generate_lessons_api_lectures__lecture_id__lessons_generate_post"];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  "/api/lectures/{lecture_id}/slides.pptx": {
+  "/api/lectures/{lecture_id}/regenerate": {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    /** Download Pptx */
-    get: operations["download_pptx_api_lectures__lecture_id__slides_pptx_get"];
+    get?: never;
     put?: never;
-    post?: never;
+    /** Regenerate */
+    post: operations["regenerate_api_lectures__lecture_id__regenerate_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -221,8 +221,77 @@ export interface paths {
     /** List Quizzes */
     get: operations["list_quizzes_api_lectures__lecture_id__quizzes_get"];
     put?: never;
+    /** Create Scope Quiz */
+    post: operations["create_scope_quiz_api_lectures__lecture_id__quizzes_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lessons/{lesson_id}/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Summary */
+    get: operations["get_summary_api_lessons__lesson_id__summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lessons/{lesson_id}/slides": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Slides */
+    get: operations["get_slides_api_lessons__lesson_id__slides_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lessons/{lesson_id}/slides.pptx": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Download Pptx */
+    get: operations["download_pptx_api_lessons__lesson_id__slides_pptx_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/lessons/{lesson_id}/quizzes": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Quizzes */
+    get: operations["list_quizzes_api_lessons__lesson_id__quizzes_get"];
+    put?: never;
     /** Create Quiz */
-    post: operations["create_quiz_api_lectures__lecture_id__quizzes_post"];
+    post: operations["create_quiz_api_lessons__lesson_id__quizzes_post"];
     delete?: never;
     options?: never;
     head?: never;
@@ -343,6 +412,10 @@ export interface components {
       lecture_id: string;
       /** Lecture Title */
       lecture_title: string;
+      /** Lesson Id */
+      lesson_id: string | null;
+      /** Scope Title */
+      scope_title: string;
       /** Score */
       score: number;
       /** Total */
@@ -367,7 +440,28 @@ export interface components {
       /** Title */
       title?: string | null;
     };
-    /** ChapterScore */
+    /** ChapterOutline */
+    ChapterOutline: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Idx */
+      idx: number;
+      /** Title */
+      title: string;
+      /** Page Start */
+      page_start: number;
+      /** Page End */
+      page_end: number;
+      /** Lessons */
+      lessons: components["schemas"]["LessonOut"][];
+    };
+    /**
+     * ChapterScore
+     * @description Điểm theo bài (quiz mới) hoặc theo chương (quiz định dạng cũ).
+     */
     ChapterScore: {
       /** Chapter Idx */
       chapter_idx: number;
@@ -378,26 +472,10 @@ export interface components {
       /** Total */
       total: number;
     };
-    /**
-     * ChapterSummary
-     * @description Lưu ở summaries.chapters; idx/title/page_* do code ghép từ bảng chapters.
-     */
-    ChapterSummary: {
-      /**
-       * Key Points
-       * @description Ý chính của chương, mỗi ý một câu hoàn chỉnh
-       */
-      key_points: string[];
-      /** Terms */
-      terms?: components["schemas"]["Term"][];
-      /** Idx */
-      idx: number;
-      /** Title */
-      title: string;
-      /** Page Start */
-      page_start: number;
-      /** Page End */
-      page_end: number;
+    /** GenerateLessons */
+    GenerateLessons: {
+      /** Lesson Ids */
+      lesson_ids: string[];
     };
     /** HTTPValidationError */
     HTTPValidationError: {
@@ -421,29 +499,6 @@ export interface components {
        * @enum {string}
        */
       redis: "ok" | "error";
-    };
-    /** LectureAvailable */
-    LectureAvailable: {
-      /**
-       * Summary
-       * @default false
-       */
-      summary: boolean;
-      /**
-       * Slides
-       * @default false
-       */
-      slides: boolean;
-      /**
-       * Pptx
-       * @default false
-       */
-      pptx: boolean;
-      /**
-       * Quiz
-       * @default false
-       */
-      quiz: boolean;
     };
     /** LectureError */
     LectureError: {
@@ -475,7 +530,12 @@ export interface components {
       /** Progress Step */
       progress_step: ("extracting" | "summarizing" | "slides" | "quiz") | null;
       error: components["schemas"]["LectureError"] | null;
-      available: components["schemas"]["LectureAvailable"];
+      lessons: components["schemas"]["LessonCounts"];
+      /**
+       * Needs Regenerate
+       * @description Bài giảng định dạng cũ (trước ADR-0017): cần tạo lại nội dung
+       */
+      needs_regenerate: boolean;
       /**
        * Created At
        * Format: date-time
@@ -500,10 +560,162 @@ export interface components {
       /** Total */
       total: number;
     };
+    /**
+     * LectureQuizCreate
+     * @description Quiz tổng hợp theo phạm vi người dùng chọn.
+     */
+    LectureQuizCreate: {
+      /**
+       * Num Questions
+       * @default 20
+       */
+      num_questions: number;
+      /** Lesson Ids */
+      lesson_ids: string[];
+    };
     /** LectureUpdate */
     LectureUpdate: {
       /** Title */
       title: string;
+    };
+    /** LessonAvailable */
+    LessonAvailable: {
+      /**
+       * Summary
+       * @default false
+       */
+      summary: boolean;
+      /**
+       * Slides
+       * @default false
+       */
+      slides: boolean;
+      /**
+       * Pptx
+       * @default false
+       */
+      pptx: boolean;
+      /**
+       * Quiz
+       * @default false
+       */
+      quiz: boolean;
+    };
+    /**
+     * LessonCounts
+     * @description Số bài theo trạng thái tạo học liệu (ADR-0017).
+     */
+    LessonCounts: {
+      /**
+       * Total
+       * @default 0
+       */
+      total: number;
+      /**
+       * Completed
+       * @default 0
+       */
+      completed: number;
+      /**
+       * Processing
+       * @default 0
+       */
+      processing: number;
+      /**
+       * Failed
+       * @default 0
+       */
+      failed: number;
+    };
+    /** LessonOut */
+    LessonOut: {
+      /**
+       * Id
+       * Format: uuid
+       */
+      id: string;
+      /** Idx */
+      idx: number;
+      /** Number */
+      number: string;
+      /** Title */
+      title: string;
+      /** Page Start */
+      page_start: number;
+      /** Page End */
+      page_end: number;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "pending" | "queued" | "processing" | "completed" | "failed";
+      /** Progress Step */
+      progress_step: ("summarizing" | "slides" | "quiz") | null;
+      error: components["schemas"]["LectureError"] | null;
+      available: components["schemas"]["LessonAvailable"];
+      /**
+       * Sections
+       * @description Mục nhỏ kèm trang, có sau khi tóm tắt
+       */
+      sections: components["schemas"]["SectionRef"][];
+    };
+    /** LessonSection */
+    LessonSection: {
+      /**
+       * Title
+       * @description Tên mục nhỏ
+       */
+      title: string;
+      /**
+       * Page Start
+       * @description Trang bắt đầu của mục
+       */
+      page_start: number;
+      /**
+       * Page End
+       * @description Trang kết thúc của mục
+       */
+      page_end: number;
+      /**
+       * Key Points
+       * @description Ý chính của mục, mỗi ý một câu hoàn chỉnh
+       */
+      key_points: string[];
+    };
+    /** LessonSlidesOut */
+    LessonSlidesOut: {
+      /**
+       * Lesson Id
+       * Format: uuid
+       */
+      lesson_id: string;
+      deck: components["schemas"]["SlideDeck"];
+      /** Pptx Available */
+      pptx_available: boolean;
+    };
+    /** LessonSummaryOut */
+    LessonSummaryOut: {
+      /**
+       * Lesson Id
+       * Format: uuid
+       */
+      lesson_id: string;
+      /** Number */
+      number: string;
+      /** Title */
+      title: string;
+      /** Page Start */
+      page_start: number;
+      /** Page End */
+      page_end: number;
+      /** Overview */
+      overview: string;
+      /** Sections */
+      sections: components["schemas"]["LessonSection"][];
+      /** Terms */
+      terms: components["schemas"]["Term"][];
+      /** Content Md */
+      content_md: string;
     };
     /** MeOut */
     MeOut: {
@@ -523,6 +735,16 @@ export interface components {
        * Format: date-time
        */
       created_at: string;
+    };
+    /** OutlineOut */
+    OutlineOut: {
+      /**
+       * Lecture Id
+       * Format: uuid
+       */
+      lecture_id: string;
+      /** Chapters */
+      chapters: components["schemas"]["ChapterOutline"][];
     };
     /**
      * QuestionPublic
@@ -572,9 +794,8 @@ export interface components {
       /**
        * Num Questions
        * @default 10
-       * @enum {integer}
        */
-      num_questions: 10 | 20 | 30;
+      num_questions: number;
     };
     /** QuizDetail */
     QuizDetail: {
@@ -590,6 +811,13 @@ export interface components {
       lecture_id: string;
       /** Lecture Title */
       lecture_title: string;
+      /** Lesson Id */
+      lesson_id: string | null;
+      /**
+       * Scope Title
+       * @description Tên bài, hoặc mô tả phạm vi quiz tổng hợp
+       */
+      scope_title: string;
       /** Num Questions */
       num_questions: number;
       /** Questions */
@@ -613,6 +841,16 @@ export interface components {
        */
       lecture_id: string;
       /**
+       * Lesson Id
+       * @description Quiz của một bài; null với quiz tổng hợp
+       */
+      lesson_id: string | null;
+      /**
+       * Lesson Ids
+       * @description Phạm vi của quiz tổng hợp
+       */
+      lesson_ids: string[] | null;
+      /**
        * Status
        * @enum {string}
        */
@@ -634,6 +872,15 @@ export interface components {
        */
       created_at: string;
     };
+    /** SectionRef */
+    SectionRef: {
+      /** Title */
+      title: string;
+      /** Page Start */
+      page_start: number;
+      /** Page End */
+      page_end: number;
+    };
     /** Slide */
     Slide: {
       /**
@@ -647,6 +894,10 @@ export interface components {
       subtitle?: string | null;
       /** Bullets */
       bullets?: string[];
+      /** Explanation */
+      explanation?: string | null;
+      /** Example */
+      example?: string | null;
       /** Notes */
       notes?: string | null;
       /** Page Refs */
@@ -664,43 +915,6 @@ export interface components {
       title: string;
       /** Slides */
       slides: components["schemas"]["Slide"][];
-    };
-    /** SlidesOut */
-    SlidesOut: {
-      /**
-       * Lecture Id
-       * Format: uuid
-       */
-      lecture_id: string;
-      deck: components["schemas"]["SlideDeck"];
-      /** Pptx Available */
-      pptx_available: boolean;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
-    };
-    /** SummaryOut */
-    SummaryOut: {
-      /**
-       * Lecture Id
-       * Format: uuid
-       */
-      lecture_id: string;
-      /** Overview */
-      overview: string;
-      /** Learning Objectives */
-      learning_objectives: string[];
-      /** Chapters */
-      chapters: components["schemas"]["ChapterSummary"][];
-      /** Content Md */
-      content_md: string;
-      /**
-       * Created At
-       * Format: date-time
-       */
-      created_at: string;
     };
     /** Term */
     Term: {
@@ -1105,7 +1319,7 @@ export interface operations {
       };
     };
   };
-  get_summary_api_lectures__lecture_id__summary_get: {
+  get_outline_api_lectures__lecture_id__outline_get: {
     parameters: {
       query?: never;
       header?: never;
@@ -1122,7 +1336,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["SummaryOut"];
+          "application/json": components["schemas"]["OutlineOut"];
         };
       };
       /** @description Validation Error */
@@ -1136,7 +1350,7 @@ export interface operations {
       };
     };
   };
-  get_slides_api_lectures__lecture_id__slides_get: {
+  generate_lessons_api_lectures__lecture_id__lessons_generate_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -1145,15 +1359,19 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GenerateLessons"];
+      };
+    };
     responses: {
       /** @description Successful Response */
-      200: {
+      202: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/json": components["schemas"]["SlidesOut"];
+          "application/json": components["schemas"]["OutlineOut"];
         };
       };
       /** @description Validation Error */
@@ -1167,7 +1385,7 @@ export interface operations {
       };
     };
   };
-  download_pptx_api_lectures__lecture_id__slides_pptx_get: {
+  regenerate_api_lectures__lecture_id__regenerate_post: {
     parameters: {
       query?: never;
       header?: never;
@@ -1179,12 +1397,12 @@ export interface operations {
     requestBody?: never;
     responses: {
       /** @description Successful Response */
-      200: {
+      202: {
         headers: {
           [name: string]: unknown;
         };
         content: {
-          "application/vnd.openxmlformats-officedocument.presentationml.presentation": unknown;
+          "application/json": components["schemas"]["LectureOut"];
         };
       };
       /** @description Validation Error */
@@ -1229,12 +1447,171 @@ export interface operations {
       };
     };
   };
-  create_quiz_api_lectures__lecture_id__quizzes_post: {
+  create_scope_quiz_api_lectures__lecture_id__quizzes_post: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         lecture_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["LectureQuizCreate"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["QuizSummary"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_summary_api_lessons__lesson_id__summary_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lesson_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LessonSummaryOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  get_slides_api_lessons__lesson_id__slides_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lesson_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["LessonSlidesOut"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  download_pptx_api_lessons__lesson_id__slides_pptx_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lesson_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  list_quizzes_api_lessons__lesson_id__quizzes_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lesson_id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["QuizList"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  create_quiz_api_lessons__lesson_id__quizzes_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        lesson_id: string;
       };
       cookie?: never;
     };

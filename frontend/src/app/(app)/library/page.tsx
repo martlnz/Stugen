@@ -83,6 +83,13 @@ function LectureCard({
           </span>
         )}
         <span>{lecture.page_count} trang</span>
+        {lecture.status === "completed" && lecture.lessons.total > 0 && (
+          <span>
+            {lecture.lessons.completed}/{lecture.lessons.total} bài đã tạo
+            {lecture.lessons.processing > 0 && ` · ${lecture.lessons.processing} đang tạo`}
+          </span>
+        )}
+        {lecture.needs_regenerate && <span className="text-primary">Cần tạo lại nội dung</span>}
         <span>{formatDate(lecture.created_at)}</span>
       </div>
     </div>

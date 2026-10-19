@@ -21,9 +21,11 @@ const LETTERS = ["A", "B", "C", "D"];
 function ResultItem({
   result,
   lectureId,
+  lessonId,
 }: {
   result: AttemptResult["results"][number];
   lectureId: string;
+  lessonId: string | null | undefined;
 }) {
   const skipped = result.selected_index === null || result.selected_index === undefined;
   return (
@@ -67,7 +69,7 @@ function ResultItem({
         <span className="font-medium">Giải thích: </span>
         <InlineMath>{result.explanation}</InlineMath>{" "}
         <Link
-          href={`/lectures/${lectureId}?tab=pdf&page=${result.page_ref}`}
+          href={`/lectures/${lectureId}?${lessonId ? `lesson=${lessonId}&` : ""}tab=pdf&page=${result.page_ref}`}
           className="whitespace-nowrap text-primary hover:underline"
         >
           (trang {result.page_ref})
@@ -105,7 +107,11 @@ export default function AttemptPage() {
   return (
     <div className="mx-auto max-w-3xl space-y-6">
       <Link
-        href={`/lectures/${data.lecture_id}?tab=quiz`}
+        href={
+          data.lesson_id
+            ? `/lectures/${data.lecture_id}?lesson=${data.lesson_id}&tab=quiz`
+            : `/lectures/${data.lecture_id}?tab=scope`
+        }
         className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
       >
         <ArrowLeft className="size-4" /> {data.lecture_title}
@@ -121,7 +127,7 @@ export default function AttemptPage() {
           </p>
         </div>
         <div className="space-y-2">
-          <p className="text-sm font-medium">Theo chương</p>
+          <p className="text-sm font-medium">{data.scope_title}</p>
           {data.by_chapter.map((ch) => (
             <div key={ch.chapter_idx} className="space-y-1">
               <div className="flex justify-between gap-2 text-xs">
@@ -168,7 +174,12 @@ export default function AttemptPage() {
       ) : (
         <ol className="space-y-3">
           {shown.map((r) => (
-            <ResultItem key={r.question_id} result={r} lectureId={data.lecture_id} />
+            <ResultItem
+              key={r.question_id}
+              result={r}
+              lectureId={data.lecture_id}
+              lessonId={data.lesson_id}
+            />
           ))}
         </ol>
       )}

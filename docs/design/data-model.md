@@ -1,10 +1,10 @@
 # Mô hình dữ liệu
 
-> Phiên bản 1.2 · Dựa trên [PRD v2.3](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016 · Cập nhật 19/10/2026
+> Phiên bản 1.3 · Dựa trên [PRD v2.4](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016, 0017 · Cập nhật 19/10/2026
 >
 > Đây là **nguồn chuẩn** cho lược đồ CSDL; lược đồ trong ADR-0006 chỉ là bản phác thảo.
 >
-> Migration đầu tiên (`backend/alembic/versions/*_initial_schema.py`) tạo đúng mục 9, trừ `llm_calls`. Tên ràng buộc theo quy ước `pk_/uq_/ck_/fk_<bảng>_...`.
+> Migration `*_initial_schema.py` tạo mục 9 (trừ `llm_calls`); migration `*_lessons_and_lesson_quizzes.py` thêm bảng `lessons` và cột quiz theo bài (ADR-0017). Tên ràng buộc theo quy ước `pk_/uq_/ck_/fk_<bảng>_...`.
 
 ## 1. Tổng quan
 
@@ -23,6 +23,8 @@ erDiagram
     users ||--o{ lectures : "sở hữu"
     users ||--o{ quiz_attempts : "làm"
     lectures ||--o{ chapters : "gồm"
+    chapters ||--o{ lessons : "chia thành"
+    lessons ||--o{ quizzes : "có"
     lectures ||--o| summaries : "có"
     lectures ||--o| slide_decks : "có"
     lectures ||--o{ quizzes : "có"
@@ -73,6 +75,26 @@ erDiagram
         int char_count
         jsonb summary
         jsonb slides
+    }
+    lessons {
+        uuid id PK
+        uuid lecture_id FK
+        uuid chapter_id FK
+        int idx
+        text number
+        text title
+        int page_start
+        int page_end
+        text text
+        int char_count
+        text status
+        text progress_step
+        text error_code
+        text error_message
+        jsonb summary
+        jsonb slides
+        text pptx_key
+        timestamptz updated_at
     }
     summaries {
         uuid id PK
@@ -199,15 +221,39 @@ Kết quả trích xuất PDF đã chia chương (ADR-0009). Dùng lại khi sin
 | `page_end` | INT | NOT NULL, ≥ page_start | |
 | `text` | TEXT | NOT NULL | Có đánh dấu `[[trang N]]` |
 | `char_count` | INT | NOT NULL | Dùng để phân bổ số câu hỏi |
-| `summary` | JSONB | NULL | `ChapterSummaryLLM` của chương, ghi ngay khi xong (ADR-0015) |
-| `slides` | JSONB | NULL | Danh sách slide `bullets` của chương, ghi ngay khi xong (ADR-0015) |
+| `summary` | JSONB | NULL | **Không còn sinh từ ADR-0017** (dữ liệu cũ) |
+| `slides` | JSONB | NULL | **Không còn sinh từ ADR-0017** (dữ liệu cũ) |
 
 Unique: `(lecture_id, idx)`.
 
-`summary` và `slides` là kết quả trung gian để chạy lại không gọi lại LLM cho chương đã xong: chương nào đã có giá trị thì bỏ qua. Khi đủ các chương, code lắp ráp `summaries` và `slide_decks` từ hai cột này.
+Từ ADR-0017, chương chỉ là cấp nhóm của mục lục; học liệu sinh theo bài ở bảng `lessons`.
+
+### 3.4a `lessons` (ADR-0017)
+Bài nhỏ (2–8 trang) trong một chương – đơn vị người dùng chọn để tạo học liệu.
+
+| Cột | Kiểu | Ràng buộc | Mô tả |
+|---|---|---|---|
+| `id` | UUID | PK | |
+| `lecture_id` | UUID | FK → lectures, CASCADE | |
+| `chapter_id` | UUID | FK → chapters, CASCADE | |
+| `idx` | INT | NOT NULL, ≥ 0 | Thứ tự trong cả giáo trình |
+| `number` | TEXT | NOT NULL | Số hiển thị, ví dụ `2.3` |
+| `title` | TEXT | NOT NULL | Từ bookmark/tiêu đề phụ/LLM; tên mơ hồ được thay bằng tên LLM đề xuất khi tóm tắt |
+| `page_start`, `page_end` | INT | NOT NULL, `page_end ≥ page_start` | |
+| `text` | TEXT | NOT NULL | Có đánh dấu `[[trang N]]` |
+| `char_count` | INT | NOT NULL | Phân bổ câu hỏi quiz tổng hợp |
+| `status` | TEXT | NOT NULL, CHECK, DEFAULT `pending` | `pending` · `queued` · `processing` · `completed` · `failed` |
+| `progress_step` | TEXT | NULL, CHECK | `summarizing` · `slides` · `quiz` |
+| `error_code`, `error_message` | TEXT | NULL | Như mục 6 |
+| `summary` | JSONB | NULL | `LessonSummary`, xem 4.5; ghi ngay khi xong |
+| `slides` | JSONB | NULL | `SlideDeck` của bài, xem 4.2 |
+| `pptx_key` | TEXT | NULL | NULL nếu xuất PPTX thất bại |
+| `updated_at` | TIMESTAMPTZ | NOT NULL | |
+
+Unique: `(lecture_id, idx)`. Index: `(chapter_id, idx)`.
 
 ### 3.5 `summaries`
-Tóm tắt của một bài giảng (1–1).
+Tóm tắt của một bài giảng (1–1). **Không còn sinh từ ADR-0017** (giữ cho dữ liệu cũ).
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 |---|---|---|---|
@@ -220,7 +266,7 @@ Tóm tắt của một bài giảng (1–1).
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
 ### 3.6 `slide_decks`
-Bộ slide của một bài giảng (1–1, ADR-0011).
+Bộ slide của một bài giảng (1–1, ADR-0011). **Không còn sinh từ ADR-0017** (giữ cho dữ liệu cũ).
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 |---|---|---|---|
@@ -231,15 +277,17 @@ Bộ slide của một bài giảng (1–1, ADR-0011).
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
 ### 3.7 `quizzes`
-Một lần sinh bộ câu hỏi. Mỗi bài giảng có 1 quiz mặc định và có thể có thêm nhiều quiz (ADR-0012).
+Một lần sinh bộ câu hỏi. Mỗi **bài** có 1 quiz mặc định và có thể có thêm quiz; ngoài ra có quiz tổng hợp trên nhiều bài người dùng chọn (ADR-0012, ADR-0017).
 
 | Cột | Kiểu | Ràng buộc | Mô tả |
 |---|---|---|---|
 | `id` | UUID | PK | |
 | `lecture_id` | UUID | FK → lectures, CASCADE | |
+| `lesson_id` | UUID | FK → lessons, CASCADE, NULL | Quiz của một bài; NULL với quiz tổng hợp/quiz cũ |
+| `lesson_ids` | JSONB | NULL | `string[]` – phạm vi quiz tổng hợp |
 | `status` | TEXT | NOT NULL, CHECK | `queued` · `processing` · `completed` · `failed` |
-| `num_questions` | INT | NOT NULL, IN (10, 20, 30) | |
-| `is_default` | BOOLEAN | NOT NULL, DEFAULT false | Quiz sinh tự động khi xử lý bài giảng |
+| `num_questions` | INT | NOT NULL, 1–30 | Quiz mặc định của bài: clamp(round(số trang × 1,5), 5, 15) |
+| `is_default` | BOOLEAN | NOT NULL, DEFAULT false | Quiz sinh tự động khi tạo học liệu cho bài |
 | `error_message` | TEXT | NULL | |
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
@@ -257,7 +305,7 @@ Index: `(lecture_id, created_at DESC)`.
 | `answer_index` | SMALLINT | NOT NULL, 0–3 | **Không bao giờ trả về trước khi nộp bài** |
 | `explanation` | TEXT | NOT NULL | |
 | `page_ref` | INT | NOT NULL | Trang tham chiếu trong PDF |
-| `chapter_idx` | INT | NOT NULL | Chương nguồn |
+| `chapter_idx` | INT | NOT NULL | Đơn vị nguồn: `lessons.idx` với quiz theo bài (ADR-0017); `chapters.idx` với quiz cũ |
 
 Unique: `(quiz_id, position)`.
 
@@ -344,6 +392,9 @@ LLM chỉ sinh `key_points` (1–8 mục) và `terms` (≤ 10 mục) – lưu �
 | `bullets` | ≤ 6 phần tử, mỗi phần tử ≤ 120 ký tự |
 | `notes`, `subtitle`, `page_refs` | Tuỳ chọn |
 
+### 4.2a Trường thêm của slide (ADR-0017)
+Slide `bullets` có thêm `explanation` (≤ 300 ký tự, giải thích dễ hiểu) và `example` (≤ 400 ký tự; bắt đầu bằng "Ví dụ minh hoạ:" khi do AI tự tạo). `bullets` tối đa 8 phần tử (slide mục lục). Bộ slide của bài: `title` (tên bài) → `agenda` (mục nhỏ kèm "tr. a–b") → 3–10 slide `bullets` → `summary` "Ghi nhớ".
+
 ### 4.3 `questions.options`
 ```json
 ["Khoá chính", "Khoá ngoại", "Chỉ mục", "Ràng buộc CHECK"]
@@ -358,6 +409,24 @@ LLM chỉ sinh `key_points` (1–8 mục) và `terms` (≤ 10 mục) – lưu �
 ```
 `null` nghĩa là bỏ trống, tính là sai.
 
+### 4.5 `lessons.summary` – `LessonSummary` (ADR-0017)
+```json
+{
+  "title": "Mục đích nghiên cứu của trí tuệ nhân tạo",
+  "overview": "Bài học trình bày các mục tiêu nghiên cứu chính của AI...",
+  "sections": [
+    {
+      "title": "Biểu diễn tri thức",
+      "page_start": 38,
+      "page_end": 39,
+      "key_points": ["Biểu diễn tri thức giúp hệ thống AI suy luận về thế giới thực."]
+    }
+  ],
+  "terms": [{ "term": "Ontology", "definition": "Bản thể học..." }]
+}
+```
+Số trang mục do LLM đọc từ `[[trang N]]`, code kẹp vào khoảng trang của bài và sắp xếp. Không chứa tên file/tên giáo trình.
+
 ## 5. Vòng đời trạng thái
 
 ### 5.1 `lectures.status`
@@ -365,27 +434,21 @@ LLM chỉ sinh `key_points` (1–8 mục) và `terms` (≤ 10 mục) – lưu �
 stateDiagram-v2
     [*] --> queued: Tải PDF hợp lệ
     queued --> processing: Worker nhận job
-    processing --> completed: Đủ tóm tắt, slide, quiz mặc định
+    processing --> completed: Đã tách mục lục chương → bài
     processing --> failed: Lỗi không phục hồi
     failed --> queued: Người dùng bấm "Thử lại"
     completed --> [*]
 ```
 
-Khi `processing`, `progress_step` lần lượt là `extracting → summarizing → slides → quiz`. Khi kết thúc (`completed`/`failed`), `progress_step` giữ bước cuối cùng đã chạy để biết lỗi ở đâu.
+Từ ADR-0017 bài giảng chỉ có bước `extracting` (tách chương và bài, vài giây). Giá trị `summarizing`, `slides`, `quiz` chỉ còn ở dữ liệu cũ. Bài giảng `completed` mà không có `lessons` là định dạng cũ (`needs_regenerate` trong API).
 
-Dữ liệu sẵn có theo bước:
-
-| `progress_step` đã qua | Dữ liệu đọc được |
-|---|---|
-| `extracting` | `chapters` |
-| `summarizing` | `summaries` |
-| `slides` | `slide_decks` |
-| `quiz` | quiz mặc định |
+### 5.1a `lessons.status` (ADR-0017)
+`pending` (chưa chọn) → `queued` (người dùng chọn) → `processing` (`progress_step`: `summarizing → slides → quiz`) → `completed` | `failed`. Bài `failed` được chọn lại để tạo lại; bước đã có kết quả (`summary`, `slides`, quiz mặc định `completed`) được bỏ qua.
 
 ### 5.2 `quizzes.status`
 `queued → processing → completed | failed`. Quiz `failed` có thể xoá hoặc tạo quiz mới; không có thử lại riêng.
 
-## 6. Mã lỗi xử lý (`lectures.error_code`)
+## 6. Mã lỗi xử lý (`lectures.error_code`, `lessons.error_code`)
 
 | Mã | Ý nghĩa | Thông điệp hiển thị |
 |---|---|---|
@@ -402,8 +465,11 @@ Bucket riêng tư `stugen` (ADR-0016):
 
 ```
 users/{user_id}/lectures/{lecture_id}/source.pdf
-users/{user_id}/lectures/{lecture_id}/slides.pptx
+users/{user_id}/lectures/{lecture_id}/slides.pptx              (định dạng cũ)
+users/{user_id}/lectures/{lecture_id}/lessons/{lesson_id}.pptx (ADR-0017)
 ```
+
+"Tạo lại nội dung" xoá `lessons/` và `slides.pptx`, giữ `source.pdf`.
 
 Xoá bài giảng → xoá bản ghi DB → xoá prefix `users/{user_id}/lectures/{lecture_id}/`.
 
@@ -411,7 +477,8 @@ Xoá bài giảng → xoá bản ghi DB → xoá prefix `users/{user_id}/lecture
 
 | Hành động | Bị xoá theo |
 |---|---|
-| Xoá bài giảng | chapters, summaries, slide_decks, quizzes → questions, quiz_attempts; file trên MinIO. `llm_calls.lecture_id` đặt NULL |
+| Xoá bài giảng | chapters → lessons, summaries, slide_decks, quizzes → questions, quiz_attempts; file trên MinIO. `llm_calls.lecture_id` đặt NULL |
+| Tạo lại nội dung | chapters → lessons, summaries, slide_decks, quizzes; PPTX trên MinIO |
 | Xoá quiz | questions, quiz_attempts |
 | Đăng xuất | Bản ghi `sessions` tương ứng |
 | Tác vụ dọn dẹp hằng ngày | `sessions` hết hạn; object MinIO không còn `lecture` tương ứng |
@@ -474,6 +541,30 @@ CREATE TABLE chapters (
   UNIQUE (lecture_id, idx)
 );
 
+CREATE TABLE lessons (
+  id            UUID PRIMARY KEY,
+  lecture_id    UUID NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
+  chapter_id    UUID NOT NULL REFERENCES chapters(id) ON DELETE CASCADE,
+  idx           INT NOT NULL CHECK (idx >= 0),
+  number        TEXT NOT NULL,
+  title         TEXT NOT NULL,
+  page_start    INT NOT NULL,
+  page_end      INT NOT NULL CHECK (page_end >= page_start),
+  text          TEXT NOT NULL,
+  char_count    INT NOT NULL,
+  status        TEXT NOT NULL DEFAULT 'pending'
+                CHECK (status IN ('pending','queued','processing','completed','failed')),
+  progress_step TEXT CHECK (progress_step IN ('summarizing','slides','quiz')),
+  error_code    TEXT,
+  error_message TEXT,
+  summary       JSONB,
+  slides        JSONB,
+  pptx_key      TEXT,
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (lecture_id, idx)
+);
+CREATE INDEX ix_lessons_chapter_idx ON lessons(chapter_id, idx);
+
 CREATE TABLE summaries (
   id                  UUID PRIMARY KEY,
   lecture_id          UUID NOT NULL UNIQUE REFERENCES lectures(id) ON DELETE CASCADE,
@@ -497,7 +588,9 @@ CREATE TABLE quizzes (
   lecture_id    UUID NOT NULL REFERENCES lectures(id) ON DELETE CASCADE,
   status        TEXT NOT NULL DEFAULT 'queued'
                 CHECK (status IN ('queued','processing','completed','failed')),
-  num_questions INT NOT NULL CHECK (num_questions IN (10, 20, 30)),
+  lesson_id     UUID REFERENCES lessons(id) ON DELETE CASCADE,
+  lesson_ids    JSONB,
+  num_questions INT NOT NULL CHECK (num_questions BETWEEN 1 AND 30),
   is_default    BOOLEAN NOT NULL DEFAULT false,
   error_message TEXT,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()

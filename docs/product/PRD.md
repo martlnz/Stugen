@@ -1,6 +1,6 @@
 # PRD – Stugen: Website tạo học liệu từ giáo trình PDF
 
-> Dự án phi thương mại · Phiên bản 2.3 · 19/10/2026
+> Dự án phi thương mại · Phiên bản 2.4 · 19/10/2026
 >
 > Tài liệu liên quan: [Mô hình dữ liệu](../design/data-model.md) · [Tài liệu API](../design/api.md) · [ADR](../adr/README.md)
 
@@ -34,32 +34,37 @@ Mọi bài giảng đã tạo được lưu theo tài khoản để xem lại sa
 - Lần đầu đăng nhập tự tạo tài khoản.
 - Các trang ngoài trang chủ đều yêu cầu đăng nhập.
 
-### 3.2 Tải lên PDF
+### 3.2 Tải lên PDF và chọn bài
 - Kéo-thả hoặc chọn file `.pdf`, tối đa **20 MB / 200 trang**.
-- Xử lý chạy nền; giao diện hiển thị trạng thái: `Đang xử lý` → `Hoàn tất` / `Lỗi`.
+- Sau vài giây, giáo trình được tách thành **chương → bài nhỏ** (mỗi bài khoảng 2–8 trang) kèm khoảng trang, theo mục lục (bookmark), tiêu đề trong PDF hoặc do AI đề xuất ([ADR-0017](../adr/0017-bai-nho-chon-pham-vi-slide-tu-van-ban-goc.md)).
+- Người dùng **chọn các bài cần học** (cả chương hoặc từng bài) rồi bấm "Tạo học liệu"; AI chỉ xử lý các bài đã chọn. Có thể tạo thêm bài khác sau.
+- Giao diện hiển thị trạng thái từng bài: `Chưa tạo` → `Đang tạo` (tóm tắt / slide / quiz) → `Đã tạo` / `Lỗi` (chọn lại để tạo lại).
 - Báo lỗi rõ ràng nếu PDF không trích xuất được văn bản.
 
-### 3.3 Tóm tắt
-- Một đoạn tổng quan cho toàn tài liệu.
-- Mỗi chương: các ý chính và thuật ngữ quan trọng kèm định nghĩa.
-- Có ghi số trang tham chiếu tới PDF gốc.
-- Hiển thị dạng Markdown (hỗ trợ công thức toán bằng KaTeX).
+### 3.3 Tóm tắt (theo bài)
+- Tổng quan ngắn của bài, **không nhắc tên file hay tên giáo trình**.
+- Các **mục nhỏ** phủ toàn bộ nội dung bài, mỗi mục có ý chính và **khoảng trang** tham chiếu tới PDF gốc.
+- Thuật ngữ quan trọng kèm định nghĩa.
+- Hiển thị công thức toán bằng KaTeX.
 - Nội dung sinh ra bằng tiếng Việt (mặc định); thuật ngữ chuyên ngành giữ nguyên gốc kèm giải nghĩa, ví dụ "Primary key (khoá chính)". Áp dụng cho cả slide và quiz.
 
-### 3.4 Slide
-- Gồm: slide tiêu đề, mục lục, các slide nội dung theo chương, slide tổng kết.
-- Mỗi slide tối đa 6 gạch đầu dòng.
+### 3.4 Slide (theo bài)
+- Slide là **phiên bản dễ hiểu** của giáo trình, AI soạn từ văn bản gốc: slide tiêu đề (tên bài), mục lục bài (các mục kèm trang), 3–10 slide nội dung, slide "Ghi nhớ".
+- Tiêu đề mỗi slide nêu đúng kiến thức chính của slide.
+- Mỗi slide nội dung: tối đa 5 gạch đầu dòng, đoạn giải thích dễ hiểu và **ví dụ** (ưu tiên ví dụ trong giáo trình; ví dụ do AI tạo ghi rõ "Ví dụ minh hoạ").
 - Xem trực tuyến ở chế độ trình chiếu và tải về dạng **PPTX**.
 
 ### 3.5 Quiz
-- Câu hỏi trắc nghiệm 4 lựa chọn, mặc định 10 câu (có thể chọn 10 / 20 / 30).
-- Mỗi câu có đáp án đúng, giải thích ngắn và số trang tham chiếu.
-- Làm bài, nộp bài, xem điểm và danh sách câu sai kèm giải thích.
+- Mỗi bài có quiz riêng, số câu theo độ dài bài (khoảng 1,5 câu/trang, 5–15 câu), rải đều các mục để phủ trọn kiến thức; có thể tạo thêm quiz cho bài.
+- **Quiz tổng hợp:** người dùng chọn phạm vi là các bài đã tạo, chọn 10 / 20 / 30 câu.
+- Câu hỏi trắc nghiệm 4 lựa chọn; mỗi câu có đáp án đúng, giải thích ngắn và số trang tham chiếu.
+- Làm bài, nộp bài, xem điểm theo từng bài và danh sách câu sai kèm giải thích.
 - Lưu lịch sử điểm các lần làm.
 
 ### 3.6 Thư viện bài giảng
-- Danh sách bài giảng của tài khoản: tên, ngày tạo, số trang, trạng thái.
-- Mỗi bài giảng có các tab: **PDF gốc · Tóm tắt · Slide · Quiz**.
+- Danh sách bài giảng của tài khoản: tên, ngày tạo, số trang, trạng thái, số bài đã tạo học liệu.
+- Trang bài giảng: **mục lục** chương → bài → mục nhỏ (kèm trang) bên trái; bài đang chọn với các tab **Tóm tắt · Slide · Quiz · PDF gốc**, cùng tab **Quiz tổng hợp**.
+- Bài giảng tạo theo cách cũ (trước v0.2) có nút "Tạo lại nội dung".
 - Đổi tên, xoá (xoá cả file PDF và nội dung đã sinh).
 - Người dùng chỉ truy cập được bài giảng của chính mình.
 
@@ -106,14 +111,10 @@ Frontend và API chạy cùng domain qua Caddy. Chi tiết: [ADR-0005](../adr/00
 
 ### 5.3 Pipeline AI
 1. Backend lưu PDF, tạo bản ghi `lecture` (`processing`), đẩy job vào hàng đợi.
-2. Worker trích xuất văn bản theo trang bằng PyMuPDF, tách chương theo mục lục (bookmark) hoặc tiêu đề; nếu không có thì chia theo số trang.
-3. Sinh tóm tắt từng chương (lưu ngay sau mỗi chương) → tổng hợp tóm tắt toàn bài.
-4. Từ tóm tắt sinh slide nội dung từng chương (JSON); slide tiêu đề, mục lục, mở chương, tổng kết do code tạo → tạo file PPTX.
-5. Sinh câu hỏi quiz theo từng chương (JSON).
-6. Đầu ra LLM luôn được kiểm tra bằng Pydantic; chính sách thử lại khi lỗi mạng hoặc sai định dạng xem [ADR-0015](../adr/0015-lam-ro-pipeline-llm.md).
-7. Lưu kết quả, cập nhật `lecture` thành `completed` hoặc `failed`.
-
-Chạy lại một bài giảng lỗi không gọi lại LLM cho các chương đã xong.
+2. Worker trích xuất văn bản theo trang bằng PyMuPDF, tách chương theo mục lục (bookmark) hoặc tiêu đề (nếu không có thì chia theo số trang), rồi tách mỗi chương thành **bài nhỏ** (bookmark cấp 2, tiêu đề phụ, hoặc AI đề xuất). Bài giảng `completed` = mục lục sẵn sàng.
+3. Người dùng chọn bài; với mỗi bài, worker: sinh tóm tắt theo mục nhỏ → sinh slide từ văn bản gốc (JSON; slide tiêu đề, mục lục, ghi nhớ do code ghép) → tạo file PPTX → sinh quiz mặc định.
+4. Đầu ra LLM luôn được kiểm tra bằng Pydantic; chính sách thử lại khi lỗi mạng hoặc sai định dạng xem [ADR-0015](../adr/0015-lam-ro-pipeline-llm.md).
+5. Kết quả mỗi bước lưu ngay; bài lỗi được tạo lại mà không gọi lại LLM cho bước đã xong.
 
 ## 6. Dữ liệu
 
@@ -139,7 +140,7 @@ Chi tiết request/response và mã lỗi: [api.md](../design/api.md).
 1. **Trang chủ** – giới thiệu ngắn, nút "Đăng nhập với Google".
 2. **Thư viện** – danh sách bài giảng, nút "Tải giáo trình mới".
 3. **Tải lên** – vùng kéo-thả PDF, trạng thái xử lý.
-4. **Bài giảng** – các tab PDF gốc / Tóm tắt / Slide / Quiz.
+4. **Bài giảng** – mục lục chương → bài (chọn bài để tạo học liệu); bài đang chọn có các tab Tóm tắt / Slide / Quiz / PDF gốc; tab Quiz tổng hợp.
 5. **Làm quiz** – từng câu hỏi, nút nộp bài.
 6. **Kết quả** – điểm, câu sai kèm giải thích.
 

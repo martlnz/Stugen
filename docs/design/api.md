@@ -1,6 +1,6 @@
 # Tài liệu API
 
-> Phiên bản 1.1 · Dựa trên [PRD v2.3](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013 và [data-model.md](data-model.md) · Cập nhật 19/10/2026 (khớp code v0.1.0)
+> Phiên bản 2.0 · Dựa trên [PRD v2.4](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013, 0017 và [data-model.md](data-model.md) · Cập nhật 19/10/2026 (khớp code v0.2.0)
 
 ## 1. Quy ước chung
 
@@ -63,8 +63,9 @@ Lỗi validate (422) có thêm `errors`:
 | 400 | `PDF_CORRUPTED` | Không mở được PDF |
 | 401 | `UNAUTHENTICATED` | Chưa đăng nhập / phiên hết hạn |
 | 403 | `CSRF_REJECTED` | Thiếu header `X-Requested-With` |
-| 404 | `LECTURE_NOT_FOUND` · `QUIZ_NOT_FOUND` · `ATTEMPT_NOT_FOUND` | Không tồn tại **hoặc không thuộc người dùng** |
-| 409 | `LECTURE_NOT_READY` | Nội dung yêu cầu chưa được tạo xong |
+| 404 | `LECTURE_NOT_FOUND` · `LESSON_NOT_FOUND` · `QUIZ_NOT_FOUND` · `ATTEMPT_NOT_FOUND` | Không tồn tại **hoặc không thuộc người dùng** |
+| 409 | `LECTURE_NOT_READY` | Mục lục chưa sẵn sàng / bài giảng đang xử lý |
+| 409 | `LESSON_NOT_READY` | Bài học chưa được tạo học liệu |
 | 409 | `LECTURE_NOT_FAILED` | Thử lại bài giảng không ở trạng thái `failed` |
 | 409 | `QUIZ_NOT_READY` | Quiz chưa `completed` |
 | 413 | `FILE_TOO_LARGE` | File > 20 MB |
@@ -101,11 +102,16 @@ Khi vượt giới hạn, response có header `Retry-After` (giây).
 | DELETE | `/lectures/{id}` | Xoá |
 | POST | `/lectures/{id}/retry` | Xử lý lại bài giảng lỗi |
 | GET | `/lectures/{id}/pdf` | Tải PDF gốc |
-| GET | `/lectures/{id}/summary` | Tóm tắt |
-| GET | `/lectures/{id}/slides` | Slide (JSON) |
-| GET | `/lectures/{id}/slides.pptx` | Tải PPTX |
-| GET | `/lectures/{id}/quizzes` | Danh sách quiz của bài giảng |
-| POST | `/lectures/{id}/quizzes` | Sinh quiz mới |
+| POST | `/lectures/{id}/regenerate` | Tạo lại nội dung (bài giảng định dạng cũ) |
+| GET | `/lectures/{id}/outline` | Mục lục chương → bài → mục nhỏ |
+| POST | `/lectures/{id}/lessons/generate` | Tạo học liệu cho các bài đã chọn |
+| GET | `/lessons/{id}/summary` | Tóm tắt một bài |
+| GET | `/lessons/{id}/slides` | Slide một bài (JSON) |
+| GET | `/lessons/{id}/slides.pptx` | Tải PPTX một bài |
+| GET | `/lessons/{id}/quizzes` | Quiz của một bài |
+| POST | `/lessons/{id}/quizzes` | Sinh thêm quiz cho một bài |
+| GET | `/lectures/{id}/quizzes` | Mọi quiz của bài giảng |
+| POST | `/lectures/{id}/quizzes` | Sinh quiz tổng hợp trên các bài đã chọn |
 | GET | `/quizzes/{id}` | Câu hỏi của quiz (không có đáp án) |
 | DELETE | `/quizzes/{id}` | Xoá quiz |
 | POST | `/quizzes/{id}/attempts` | Nộp bài, chấm điểm |
@@ -185,15 +191,11 @@ Xoá phiên hiện tại và cookie.
   "original_filename": "nhap-mon-csdl.pdf",
   "file_size": 4823011,
   "page_count": 142,
-  "status": "processing",
-  "progress_step": "summarizing",
+  "status": "completed",
+  "progress_step": "extracting",
   "error": null,
-  "available": {
-    "summary": false,
-    "slides": false,
-    "pptx": false,
-    "quiz": false
-  },
+  "lessons": { "total": 30, "completed": 4, "processing": 1, "failed": 0 },
+  "needs_regenerate": false,
   "created_at": "2026-10-18T09:30:00Z",
   "updated_at": "2026-10-18T09:31:12Z",
   "completed_at": null
@@ -202,10 +204,11 @@ Xoá phiên hiện tại và cookie.
 
 | Trường | Mô tả |
 |---|---|
-| `status` | `queued` · `processing` · `completed` · `failed` |
-| `progress_step` | `extracting` · `summarizing` · `slides` · `quiz` · `null` |
+| `status` | `queued` · `processing` · `completed` (= mục lục đã sẵn sàng, ADR-0017) · `failed` |
+| `progress_step` | `extracting` · `null` (giá trị `summarizing`/`slides`/`quiz` chỉ còn ở dữ liệu cũ) |
 | `error` | `null` hoặc `{ "code": "PDF_NO_TEXT", "message": "Giáo trình có vẻ là bản scan, hiện chưa được hỗ trợ." }` |
-| `available` | Phần nào đã sẵn sàng; frontend dùng để bật tab tương ứng mà không cần chờ hoàn tất |
+| `lessons` | Số bài theo trạng thái tạo học liệu |
+| `needs_regenerate` | `true` nếu bài giảng tạo theo luồng cũ (hoàn tất nhưng không có bài) → hiện nút "Tạo lại nội dung" |
 
 ### `POST /lectures`
 Tải PDF lên và bắt đầu xử lý.
@@ -286,72 +289,96 @@ Tải PDF gốc.
 
 ---
 
-## 7. Tóm tắt
+## 7. Mục lục và bài học (ADR-0017)
 
-### `GET /lectures/{id}/summary`
+### `POST /lectures/{id}/regenerate`
+Xoá chương, bài, tóm tắt, slide, quiz (kèm lịch sử làm bài) và file PPTX; giữ PDF; tách mục lục lại.
+
+**202** – `Lecture` với `status: "queued"`. **409** `LECTURE_NOT_READY` nếu đang xử lý.
+
+### `GET /lectures/{id}/outline`
+Mục lục chương → bài. Frontend polling 3 giây khi có bài `queued`/`processing`.
 
 **200**
 ```json
 {
   "lecture_id": "5d2c8a40-...",
-  "overview": "Giáo trình giới thiệu các khái niệm nền tảng về cơ sở dữ liệu...",
-  "learning_objectives": [
-    "Hiểu vai trò của hệ quản trị cơ sở dữ liệu",
-    "Thiết kế được lược đồ quan hệ ở dạng chuẩn 3NF"
-  ],
   "chapters": [
     {
-      "idx": 0,
-      "title": "Chương 1. Tổng quan về cơ sở dữ liệu",
-      "key_points": ["..."],
-      "terms": [{ "term": "DBMS", "definition": "..." }],
-      "page_start": 1,
-      "page_end": 18
+      "id": "c1...",
+      "idx": 1,
+      "title": "Chương 2. Thuật toán",
+      "page_start": 10,
+      "page_end": 16,
+      "lessons": [
+        {
+          "id": "b43092d1-...",
+          "idx": 6,
+          "number": "2.3",
+          "title": "Hình thức hóa thuật toán và các phương pháp biểu diễn",
+          "page_start": 11,
+          "page_end": 13,
+          "status": "completed",
+          "progress_step": "quiz",
+          "error": null,
+          "available": { "summary": true, "slides": true, "pptx": true, "quiz": true },
+          "sections": [
+            { "title": "Định nghĩa thuật toán và luận điểm Turing", "page_start": 11, "page_end": 12 }
+          ]
+        }
+      ]
     }
-  ],
-  "content_md": "# Nhập môn Cơ sở dữ liệu\n\n## Tổng quan\n...",
-  "created_at": "2026-10-18T09:32:40Z"
+  ]
 }
 ```
 
-Frontend hiển thị `content_md` (react-markdown + KaTeX), dùng `chapters` để dựng mục lục bên cạnh và liên kết số trang sang tab PDF gốc.
+| Trường bài | Mô tả |
+|---|---|
+| `status` | `pending` (chưa chọn) · `queued` · `processing` · `completed` · `failed` |
+| `progress_step` | `summarizing` · `slides` · `quiz` · `null` |
+| `sections` | Mục nhỏ kèm trang, có sau khi tóm tắt (rỗng nếu chưa) |
 
-**409** `LECTURE_NOT_READY` nếu chưa có tóm tắt.
+### `POST /lectures/{id}/lessons/generate`
+Xếp hàng tạo tóm tắt + slide + quiz mặc định cho các bài đã chọn. Bài `queued`/`processing`/`completed` được bỏ qua; bài `failed` được tạo lại (bước đã xong không chạy lại).
 
----
+**Request**
+```json
+{ "lesson_ids": ["b43092d1-...", "4a8146a5-..."] }
+```
 
-## 8. Slide
+**202** – `Outline` mới. **409** `LECTURE_NOT_READY` nếu mục lục chưa sẵn sàng. **422** nếu danh sách rỗng hoặc có bài không thuộc bài giảng.
 
-### `GET /lectures/{id}/slides`
+## 8. Nội dung một bài
 
+### `GET /lessons/{id}/summary`
 **200**
 ```json
 {
-  "lecture_id": "5d2c8a40-...",
-  "deck": {
-    "version": 1,
-    "title": "Nhập môn Cơ sở dữ liệu",
-    "slides": [
-      { "layout": "title", "title": "Nhập môn Cơ sở dữ liệu", "subtitle": "Tóm lược giáo trình" },
-      {
-        "layout": "bullets",
-        "title": "Hệ quản trị CSDL",
-        "bullets": ["Lưu trữ và truy xuất dữ liệu", "Đảm bảo toàn vẹn và bảo mật"],
-        "notes": "Nhấn mạnh vai trò trung gian.",
-        "page_refs": [5, 6]
-      }
-    ]
-  },
-  "pptx_available": true,
-  "created_at": "2026-10-18T09:33:30Z"
+  "lesson_id": "b43092d1-...",
+  "number": "2.3",
+  "title": "Hình thức hóa thuật toán và các phương pháp biểu diễn",
+  "page_start": 11,
+  "page_end": 13,
+  "overview": "Bài học trình bày...",
+  "sections": [
+    {
+      "title": "Định nghĩa thuật toán và luận điểm Turing",
+      "page_start": 11,
+      "page_end": 12,
+      "key_points": ["..."]
+    }
+  ],
+  "terms": [{ "term": "Máy Turing", "definition": "..." }],
+  "content_md": "## Tổng quan\n\n...\n\n### Định nghĩa thuật toán... *(tr. 11–12)*\n..."
 }
 ```
-Cấu trúc `deck` xem [data-model.md](data-model.md#42-slide_decksdeck--slidedeck). **409** `LECTURE_NOT_READY`.
+Không chứa tên file hay tên giáo trình. **409** `LESSON_NOT_READY`, **404** `LESSON_NOT_FOUND`.
 
-### `GET /lectures/{id}/slides.pptx`
-**200** – `Content-Type: application/vnd.openxmlformats-officedocument.presentationml.presentation`, `Content-Disposition: attachment; filename="<title>.pptx"` (tên file mã hoá theo RFC 5987 để giữ tiếng Việt).
+### `GET /lessons/{id}/slides`
+**200** – `{ "lesson_id", "deck": SlideDeck, "pptx_available": true }`. Slide nội dung có thêm `explanation` và `example` (xem [data-model.md](data-model.md) 4.2a). **409** `LESSON_NOT_READY`.
 
-**409** `LECTURE_NOT_READY` nếu chưa có slide hoặc xuất PPTX thất bại.
+### `GET /lessons/{id}/slides.pptx`
+**200** – file PPTX, tên "số bài + tên bài".pptx (RFC 5987). **409** `LESSON_NOT_READY` nếu chưa có slide hoặc xuất PPTX thất bại.
 
 ---
 
@@ -362,8 +389,10 @@ Cấu trúc `deck` xem [data-model.md](data-model.md#42-slide_decksdeck--slidede
 {
   "id": "a41f9e22-...",
   "lecture_id": "5d2c8a40-...",
+  "lesson_id": "b43092d1-...",
+  "lesson_ids": null,
   "status": "completed",
-  "num_questions": 10,
+  "num_questions": 5,
   "is_default": true,
   "error": null,
   "attempt_count": 2,
@@ -373,30 +402,38 @@ Cấu trúc `deck` xem [data-model.md](data-model.md#42-slide_decksdeck--slidede
 }
 ```
 
+`lesson_id`: quiz của một bài (`null` với quiz tổng hợp hoặc quiz cũ). `lesson_ids`: phạm vi quiz tổng hợp. Quiz mặc định của bài có `num_questions` = clamp(round(số trang × 1,5), 5, 15).
+
 `error`: `null` hoặc `{ "code": "QUIZ_FAILED", "message": "<thông điệp tiếng Việt>" }` khi `status = failed`. `attempt_count`, `best_score`, `last_attempt_at` chỉ tính các lần làm của người dùng hiện tại.
 
-### `GET /lectures/{id}/quizzes`
-Danh sách quiz của bài giảng, mới nhất trước (không phân trang).
+### `GET /lectures/{id}/quizzes` · `GET /lessons/{id}/quizzes`
+Danh sách quiz của bài giảng (mọi loại) hoặc của một bài, mới nhất trước (không phân trang).
 
 **200**
 ```json
 { "items": [ { "...": "QuizSummary" } ] }
 ```
 
+### `POST /lessons/{id}/quizzes`
+Sinh thêm quiz cho một bài (bất đồng bộ). Bài phải đã tạo học liệu.
+
+**Request** – `{ "num_questions": 10 }` (5–30, mặc định 10).
+
+**202** – `QuizSummary` với `status: "queued"`. Frontend polling danh sách quiz tới khi `completed`/`failed`. **409** `LESSON_NOT_READY`.
+
 ### `POST /lectures/{id}/quizzes`
-Sinh quiz mới (bất đồng bộ). Bài giảng phải có `chapters` (đã qua bước trích xuất).
+Sinh **quiz tổng hợp** trên các bài người dùng chọn (đã tạo học liệu); câu hỏi phân bổ theo độ dài từng bài.
 
 **Request**
 ```json
-{ "num_questions": 20 }
+{ "num_questions": 20, "lesson_ids": ["b43092d1-...", "4a8146a5-..."] }
 ```
 | Trường | Giá trị |
 |---|---|
-| `num_questions` | `10` · `20` · `30` (mặc định 10) |
+| `num_questions` | 5–30 (mặc định 20) |
+| `lesson_ids` | ≥ 1 bài thuộc bài giảng |
 
-**202** – `QuizSummary` với `status: "queued"`. Frontend polling `GET /lectures/{id}/quizzes` tới khi `completed`/`failed`.
-
-**409** `LECTURE_NOT_READY`, **429** `RATE_LIMITED`.
+**202** – `QuizSummary`. **409** `LESSON_NOT_READY` nếu có bài chưa tạo học liệu. **422** nếu có bài không thuộc bài giảng.
 
 ### `GET /quizzes/{id}`
 Lấy câu hỏi để làm bài. **Không** chứa `answer_index` và `explanation`.
@@ -407,6 +444,8 @@ Lấy câu hỏi để làm bài. **Không** chứa `answer_index` và `explanat
   "id": "a41f9e22-...",
   "lecture_id": "5d2c8a40-...",
   "lecture_title": "Nhập môn Cơ sở dữ liệu",
+  "lesson_id": "b43092d1-...",
+  "scope_title": "Bài 2.3: Hình thức hóa thuật toán và các phương pháp biểu diễn",
   "num_questions": 10,
   "questions": [
     {
@@ -447,6 +486,8 @@ Nộp bài và chấm điểm.
   "quiz_id": "a41f9e22-...",
   "lecture_id": "5d2c8a40-...",
   "lecture_title": "Nhập môn Cơ sở dữ liệu",
+  "lesson_id": "b43092d1-...",
+  "scope_title": "Bài 2.3: Hình thức hóa thuật toán và các phương pháp biểu diễn",
   "score": 7,
   "total": 10,
   "created_at": "2026-10-18T10:05:00Z",
@@ -469,7 +510,7 @@ Nộp bài và chấm điểm.
   ]
 }
 ```
-`by_chapter` giúp người dùng biết chương nào cần ôn lại. `lecture_id`, `lecture_title` để trang kết quả liên kết về bài giảng và tab PDF gốc.
+`by_chapter` giúp người dùng biết phần nào cần ôn lại: với quiz theo bài/quiz tổng hợp, mỗi phần tử là một **bài** (`chapter_idx` = `lessons.idx`, `title` = số bài + tên bài); với quiz cũ là chương. `scope_title`: "Bài 2.3: …", "Quiz tổng hợp N bài" hoặc "Toàn bài giảng". `lecture_id`, `lecture_title` để trang kết quả liên kết về bài giảng và tab PDF gốc.
 
 Lỗi validate có `errors`, ví dụ `[{ "field": "answers.<question_id>", "message": "Câu hỏi không thuộc quiz này." }]`. **409** `QUIZ_NOT_READY` nếu quiz chưa `completed`.
 
@@ -502,12 +543,13 @@ Xem lại chi tiết một lần làm bài.
 2. (trình duyệt) /api/auth/google/login  → Google → callback → /library
 3. GET  /api/lectures                    → hiển thị thư viện
 4. POST /api/lectures (multipart)        → 201 {status: queued}
-5. GET  /api/lectures/{id}  (mỗi 3 giây) → processing/summarizing ... → completed
-6. GET  /api/lectures/{id}/summary       → tab Tóm tắt
-7. GET  /api/lectures/{id}/slides        → tab Slide
-8. GET  /api/lectures/{id}/quizzes       → quiz mặc định
-9. GET  /api/quizzes/{qid}               → làm bài
-10. POST /api/quizzes/{qid}/attempts     → kết quả, giải thích
+5. GET  /api/lectures/{id}  (mỗi 3 giây) → processing/extracting → completed (vài giây)
+6. GET  /api/lectures/{id}/outline       → mục lục chương → bài
+7. POST /api/lectures/{id}/lessons/generate {lesson_ids} → bài queued
+8. GET  /api/lectures/{id}/outline (mỗi 3 giây) → bài completed
+9. GET  /api/lessons/{lid}/summary | slides | quizzes → tab Tóm tắt, Slide, Quiz
+10. GET  /api/quizzes/{qid}              → làm bài
+11. POST /api/quizzes/{qid}/attempts     → kết quả, giải thích
 ```
 
 ## 11. Kiểu TypeScript cho frontend

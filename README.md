@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <img alt="Status" src="https://img.shields.io/badge/version-0.1.0-blue">
+  <img alt="Status" src="https://img.shields.io/badge/version-0.2.0-blue">
   <img alt="Next.js" src="https://img.shields.io/badge/Next.js-TypeScript-black?logo=nextdotjs">
   <img alt="FastAPI" src="https://img.shields.io/badge/FastAPI-Python%203.12-009688?logo=fastapi&logoColor=white">
   <img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-16-336791?logo=postgresql&logoColor=white">
@@ -17,14 +17,15 @@
 
 **Stugen** là website phi thương mại giúp sinh viên và người tự học ôn tập nhanh hơn. Người dùng đăng nhập bằng tài khoản Google, tải lên giáo trình PDF và nhận về:
 
-- 📝 **Tóm tắt** theo chương — ý chính, thuật ngữ kèm định nghĩa, số trang tham chiếu tới PDF gốc, hỗ trợ công thức toán.
-- 📊 **Slide** trình chiếu — xem trực tuyến hoặc tải về dạng **PPTX**.
-- ✅ **Quiz** trắc nghiệm 4 lựa chọn (10 / 20 / 30 câu) — chấm điểm, giải thích, lưu lịch sử làm bài.
+- 📚 **Mục lục bài nhỏ** — giáo trình được tách thành chương → bài (kèm trang); chỉ tạo học liệu cho những bài bạn chọn.
+- 📝 **Tóm tắt** theo từng mục nhỏ — ý chính, thuật ngữ kèm định nghĩa, khoảng trang tham chiếu tới PDF gốc, hỗ trợ công thức toán.
+- 📊 **Slide** dễ hiểu — giải thích bằng lời thường và ví dụ minh hoạ; xem trực tuyến hoặc tải về dạng **PPTX**.
+- ✅ **Quiz** trắc nghiệm 4 lựa chọn cho từng bài và quiz tổng hợp theo phạm vi tự chọn — chấm điểm, giải thích, lưu lịch sử làm bài.
 
 Mọi bài giảng được lưu trong **thư viện cá nhân** theo tài khoản để xem lại sau.
 
 > [!NOTE]
-> Bản **v0.1.0** chạy được trọn luồng đăng nhập Google → tải PDF → tóm tắt, slide, quiz → thư viện trên máy local. Hạn chế đã biết: [docs/known-issues.md](docs/known-issues.md).
+> Bản **v0.2.0**: tải giáo trình → tách thành chương và bài nhỏ → chọn bài cần học → tóm tắt theo mục, slide dễ hiểu có ví dụ, quiz riêng từng bài và quiz tổng hợp. Hạn chế đã biết: [docs/known-issues.md](docs/known-issues.md).
 
 ## Kiến trúc
 
@@ -62,7 +63,7 @@ Chi tiết: [ADR-0002](docs/adr/0002-kien-truc-tong-the.md).
 | Tài liệu | Nội dung |
 |---|---|
 | [PRD](docs/product/PRD.md) | Sản phẩm làm gì, phạm vi, chức năng, tiêu chí hoàn thành |
-| [ADR](docs/adr/README.md) | 16 quyết định kiến trúc và lý do lựa chọn |
+| [ADR](docs/adr/README.md) | 17 quyết định kiến trúc và lý do lựa chọn |
 | [Mô hình dữ liệu](docs/design/data-model.md) | ERD, chi tiết bảng, cấu trúc JSONB, vòng đời trạng thái, DDL |
 | [Tài liệu API](docs/design/api.md) | Hợp đồng REST giữa frontend và backend, mã lỗi |
 | [Tiến độ](docs/progress.md) | Đã làm gì, việc tiếp theo, vấn đề mở – đọc đầu tiên khi tiếp tục dự án |
@@ -146,10 +147,10 @@ Không có API key LLM? Đặt `LLM_PROVIDER=fake` trong `.env` để chạy pip
 
 | Tài liệu | Phiên bản | Ngày |
 |---|---|---|
-| PRD | 2.3 | 19/10/2026 |
-| ADR | 0001–0016 | 19/10/2026 |
-| Mô hình dữ liệu | 1.2 | 19/10/2026 |
-| Tài liệu API | 1.1 | 19/10/2026 |
+| PRD | 2.4 | 19/10/2026 |
+| ADR | 0001–0017 | 19/10/2026 |
+| Mô hình dữ liệu | 1.3 | 19/10/2026 |
+| Tài liệu API | 2.0 | 19/10/2026 |
 
 ## Giấy phép
 

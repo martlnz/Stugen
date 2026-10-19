@@ -10,7 +10,7 @@ Hướng dẫn cho Claude Code khi làm việc trong repository này.
 
 Tài liệu nguồn (đọc trước khi làm tính năng liên quan):
 - `docs/product/PRD.md` – yêu cầu và phạm vi
-- `docs/adr/` – quyết định kiến trúc (0001–0016)
+- `docs/adr/` – quyết định kiến trúc (0001–0017)
 - `docs/design/data-model.md` – lược đồ CSDL, cấu trúc JSONB
 - `docs/design/api.md` – hợp đồng API (nguồn chuẩn cho request/response)
 - `docs/plans/plan-1-ngay.md` – kế hoạch hiện tại
@@ -68,11 +68,13 @@ just gen-api     # = cd frontend && npm run gen:api → openapi-typescript http:
 - Mọi lời gọi LLM đi qua `LLMClient` trong `app/ai/llm/`; không import SDK nhà cung cấp ở nơi khác.
 - Đầu ra LLM luôn validate bằng Pydantic trước khi ghi DB; sai định dạng → sửa 1 lần kèm thông báo lỗi (ADR-0015).
 - Lỗi tạm thời của LLM (timeout, 429, 5xx) → thử lại 2 lần có backoff ngay trong `LLMClient`; Celery chỉ retry task cho lỗi hạ tầng (DB, Redis, MinIO).
-- Code sinh slide `title`, `agenda`, `section`, `summary`; LLM chỉ sinh slide `bullets` từng chương. LLM không trả số trang chương.
+- Học liệu sinh theo **bài nhỏ** người dùng chọn (ADR-0017): tải lên chỉ tách mục lục chương → bài; `generate_lesson` tạo tóm tắt → slide → quiz cho từng bài.
+- Code sinh slide `title`, `agenda`, `summary` (Ghi nhớ); LLM sinh slide nội dung từ văn bản gốc của bài (có `explanation`, `example`). LLM không trả số trang chương/bài; số trang mục nhỏ do code kẹp vào khoảng bài.
 - Prompt nằm trong `app/ai/prompts/*.j2`, không viết prompt dài inline trong code.
 - LLM mặc định là DeepSeek qua provider `openai_compatible` (ADR-0016). Provider có cờ `supports_json_schema`; khi cờ tắt thì dùng `response_format={"type": "json_object"}`, prompt chứa chữ "json" và ví dụ JSON sinh từ schema. `content` rỗng tính là đầu ra sai định dạng. Tắt thinking (`extra_body={"thinking": {"type": "disabled"}}`), `max_tokens` 4–8K, timeout ~120 giây.
-- Task worker phải idempotent: kiểm tra kết quả đã có trước khi chạy lại bước. Kết quả LLM từng chương ghi ngay vào `chapters.summary` / `chapters.slides`; chương đã có giá trị thì bỏ qua.
-- Prompt sinh nội dung theo `CONTENT_LANGUAGE` (mặc định `vi`: tiếng Việt, thuật ngữ giữ nguyên gốc kèm giải nghĩa).
+- Task worker phải idempotent: kiểm tra kết quả đã có trước khi chạy lại bước. Kết quả LLM từng bài ghi ngay vào `lessons.summary` / `lessons.slides`; bài đã có giá trị thì bỏ qua bước đó.
+- Prompt sinh nội dung theo `CONTENT_LANGUAGE` (mặc định `vi`: tiếng Việt, thuật ngữ giữ nguyên gốc kèm giải nghĩa). Tóm tắt và quiz chỉ dùng thông tin giáo trình; riêng slide được tạo ví dụ minh hoạ có nhãn.
+- Giới hạn hiển thị (độ dài, số phần tử) do schema cắt gọn bằng code, không bắt LLM đếm ký tự.
 - Thay đổi lược đồ → tạo migration Alembic, không sửa migration đã có.
 
 **Tài liệu**
@@ -98,7 +100,8 @@ just gen-api     # = cd frontend && npm run gen:api → openapi-typescript http:
 ## Kiểm thử
 
 - Backend: `pytest` + `httpx.AsyncClient`, DB test riêng. Dùng `FakeLLMClient` – **không gọi LLM thật trong test**.
-- Bắt buộc có test cho: kiểm tra quyền sở hữu (404), ẩn đáp án quiz, chấm điểm, validate upload PDF.
+- Bắt buộc có test cho: kiểm tra quyền sở hữu (404, cả bài giảng và bài học), ẩn đáp án quiz, chấm điểm, validate upload PDF.
+- Kiểm tra giao diện: Playwright + Chromium headless cài tạm ngoài repo, cookie `sid` lấy từ `just session`.
 - File PDF mẫu trong `backend/tests/fixtures/`.
 
 ## Hoàn thành một việc khi

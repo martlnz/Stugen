@@ -1,6 +1,6 @@
 # ADR-0012: Quiz chấm điểm phía server, không lộ đáp án
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0017](0017-bai-nho-chon-pham-vi-slide-tu-van-ban-goc.md)
 - **Ngày:** 2026-10-18
 
 ## Bối cảnh

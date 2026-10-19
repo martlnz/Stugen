@@ -1,0 +1,25 @@
+Soạn slide giảng dạy cho bài học "{{ lesson_title }}" (trang {{ page_start }}–{{ page_end }}) dựa trên văn bản gốc bên dưới.
+Slide là phiên bản DỄ HIỂU của giáo trình dành cho sinh viên mới học, không phải bản tóm tắt: hãy giải thích lại, sắp xếp ý cho mạch lạc, dùng ví dụ cụ thể.
+
+Các mục của bài (dùng làm khung, có thể gộp hoặc tách thành nhiều slide):
+{% for s in sections %}- {{ s.title }} (trang {{ s.page_start }}–{{ s.page_end }})
+{% endfor %}
+
+Yêu cầu:
+- slides: {{ min_slides }}–{{ max_slides }} slide nội dung, theo thứ tự các mục, phủ hết các ý quan trọng.
+- title: nêu đúng kiến thức chính của slide (dưới 60 ký tự), ví dụ "Khoá ngoại liên kết hai bảng", KHÔNG dùng tiêu đề chung chung như "Giới thiệu", "Tổng quan", "Nội dung chính", và không lặp lại tên bài.
+- bullets: 2–5 ý ngắn gọn (mỗi ý dưới 100 ký tự), mỗi ý một thông tin rõ ràng.
+- explanation: 1–3 câu giải thích bằng lời thường, như giảng viên nói với sinh viên: vì sao, dùng để làm gì, liên hệ thế nào.
+- example: một ví dụ cụ thể giúp hiểu kiến thức của slide (tình huống, số liệu, đoạn code ngắn, phép tính...). Ưu tiên ví dụ có trong giáo trình; nếu giáo trình không có thì tự tạo ví dụ đơn giản, đúng với nội dung giáo trình, và bắt đầu bằng "Ví dụ minh hoạ:". Có thể bỏ trống với slide không cần ví dụ.
+- notes: 1–3 câu gợi ý cho người thuyết trình.
+- page_refs: các số trang liên quan, trong khoảng {{ page_start }}–{{ page_end }}.
+- takeaways: 3–5 điều quan trọng nhất cần ghi nhớ sau bài (mỗi điều dưới 100 ký tự).
+- Không tạo slide tiêu đề, mục lục hay tổng kết (đã có sẵn).
+- Kiến thức trong bullets và explanation phải đúng với giáo trình; chỉ ví dụ minh hoạ mới được tự tạo.
+- Công thức toán viết dạng LaTeX trong $...$.
+{% if content_language == "vi" %}- Viết bằng tiếng Việt.{% endif %}
+
+Văn bản bài học:
+"""
+{{ lesson_text }}
+"""

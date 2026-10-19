@@ -11,45 +11,71 @@ from app.ai.llm.base import LLMInvalidOutput, OutputError, Validator, parse_outp
 
 PAGE_RE = re.compile(r"\[\[trang (\d+)\]\]")
 COUNT_RE = re.compile(r"Số câu hỏi cần tạo:\s*(\d+)")
-TITLE_RE = re.compile(r"Chương:\s*(.+)")
-
-
+TITLE_RE = re.compile(r"(?:Bài|Chương):\s*(.+?)(?: \(trang|$)", re.MULTILINE)
+QUOTED_TITLE_RE = re.compile(r"bài học \"(.+?)\"")
 RANGE_RE = re.compile(r"trang (\d+)–(\d+)")
+
+
+def _range(user: str) -> tuple[int, int]:
+    if match := RANGE_RE.search(user):
+        return int(match.group(1)), int(match.group(2))
+    markers = [int(p) for p in PAGE_RE.findall(user)] or [1]
+    return min(markers), max(markers)
 
 
 def _pages(user: str) -> list[int]:
     if markers := PAGE_RE.findall(user):
         return [int(p) for p in markers]
-    if match := RANGE_RE.search(user):
-        return [int(match.group(1))]
-    return [1]
+    return [_range(user)[0]]
+
+
+def _title(user: str) -> str:
+    match = TITLE_RE.search(user) or QUOTED_TITLE_RE.search(user)
+    return match.group(1).strip()[:60] if match else "Nội dung"
 
 
 def _default(schema_name: str, user: str) -> dict[str, Any]:
     pages = _pages(user)
-    title_match = TITLE_RE.search(user)
-    title = title_match.group(1).strip()[:60] if title_match else "Nội dung"
+    start, end = _range(user)
+    title = _title(user)
     match schema_name:
-        case "ChapterSummaryLLM":
+        case "OutlineLLM":
+            mid = (start + end) // 2 + 1
             return {
-                "key_points": [f"Ý chính {i + 1} của {title}." for i in range(3)],
+                "chapter_title": "Chủ đề do AI đặt tên",
+                "lessons": [
+                    {"title": "Bài mở đầu", "start_page": start},
+                    {"title": "Bài tiếp theo", "start_page": mid},
+                ],
+            }
+        case "LessonSummaryLLM":
+            return {
+                "overview": f"Bài {title} trình bày các khái niệm nền tảng.",
+                "sections": [
+                    {
+                        "title": f"Mục {i + 1} của {title}",
+                        "page_start": p,
+                        "page_end": p,
+                        "key_points": [f"Ý chính {k + 1} của mục {i + 1}." for k in range(2)],
+                    }
+                    for i, p in enumerate(sorted(set(pages)))
+                ],
                 "terms": [{"term": "DBMS", "definition": "Hệ quản trị cơ sở dữ liệu."}],
             }
-        case "OverviewLLM":
-            return {
-                "overview": "Giáo trình trình bày các khái niệm nền tảng.",
-                "learning_objectives": ["Hiểu khái niệm cơ bản", "Vận dụng vào bài tập"],
-            }
-        case "ChapterSlidesLLM":
+        case "LessonSlidesLLM":
             return {
                 "slides": [
                     {
-                        "title": title,
-                        "bullets": ["Khái niệm chính", "Ví dụ minh hoạ"],
-                        "notes": "Giới thiệu chương.",
+                        "title": f"Kiến thức {i + 1} của {title}",
+                        "bullets": ["Khái niệm chính", "Cách áp dụng"],
+                        "explanation": "Giải thích dễ hiểu.",
+                        "example": "Ví dụ minh hoạ: một bảng sinh viên có khoá chính MSSV.",
+                        "notes": "Gợi ý thuyết trình.",
                         "page_refs": pages[:1],
                     }
-                ]
+                    for i in range(3)
+                ],
+                "takeaways": ["Điều cần nhớ 1", "Điều cần nhớ 2", "Điều cần nhớ 3"],
             }
         case "QuestionSetLLM":
             count_match = COUNT_RE.search(user)

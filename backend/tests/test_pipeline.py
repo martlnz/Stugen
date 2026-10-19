@@ -1,35 +1,39 @@
-"""Pipeline xử lý bài giảng với FakeLLMClient và storage trong bộ nhớ."""
+"""Pipeline (ADR-0017): tách mục lục chương → bài, tạo học liệu theo bài với FakeLLMClient."""
 
 import uuid
 from pathlib import Path
 
-import pytest
 from sqlalchemy import select
 
-from app.ai.generators.quiz import allocate
+from app.ai.generators.lesson import _clamp_sections, summary_markdown
+from app.ai.generators.quiz import allocate, default_question_count
 from app.ai.llm.fake import FakeLLMClient
 from app.ai.pdf import extract_chapters
-from app.db.models import Chapter, Lecture, Question, Quiz, SlideDeck, Summary, User
+from app.db.models import Chapter, Lecture, Lesson, Question, Quiz, User
 from app.db.session import sync_session
-from app.schemas.llm import ChapterSlidesLLM, clip
+from app.schemas.llm import LessonSection, LessonSlidesLLM, LessonSummaryLLM, clip
 from app.worker.pipeline import LecturePipeline
 from tests.fakes import MemoryStorage
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
-def make_lecture(storage: MemoryStorage, pdf: str = "sample.pdf") -> uuid.UUID:
+def make_lecture(
+    storage: MemoryStorage, pdf: str = "sample.pdf", user_id: uuid.UUID | None = None
+) -> uuid.UUID:
     with sync_session() as db:
-        user = User(google_id=f"g-{uuid.uuid4()}", email="p@example.com", name="p")
-        db.add(user)
-        db.flush()
+        if user_id is None:
+            user = User(google_id=f"g-{uuid.uuid4()}", email="p@example.com", name="p")
+            db.add(user)
+            db.flush()
+            user_id = user.id
         lecture = Lecture(
-            user_id=user.id,
-            title="Nhập môn CSDL",
+            user_id=user_id,
+            title="giao-trinh-csdl-final",
             original_filename=pdf,
-            pdf_key=f"users/{user.id}/lectures/x/source.pdf",
+            pdf_key=f"users/{user_id}/lectures/{uuid.uuid4()}/source.pdf",
             file_size=1,
-            page_count=6,
+            page_count=14,
         )
         db.add(lecture)
         db.commit()
@@ -46,6 +50,22 @@ def run(lecture_id: uuid.UUID, llm: FakeLLMClient, storage: MemoryStorage) -> Le
         return lecture
 
 
+def lessons_of(lecture_id: uuid.UUID) -> list[Lesson]:
+    with sync_session() as db:
+        return list(
+            db.scalars(select(Lesson).where(Lesson.lecture_id == lecture_id).order_by(Lesson.idx))
+        )
+
+
+def run_lesson(lesson_id: uuid.UUID, llm: FakeLLMClient, storage: MemoryStorage) -> Lesson:
+    with sync_session() as db:
+        LecturePipeline(db, llm, storage).run_lesson(lesson_id)
+    with sync_session() as db:
+        lesson = db.get(Lesson, lesson_id)
+        assert lesson is not None
+        return lesson
+
+
 def test_extract_chapters_from_bookmarks() -> None:
     chapters = extract_chapters((FIXTURES / "sample.pdf").read_bytes())
     assert [c.title for c in chapters] == [
@@ -53,59 +73,57 @@ def test_extract_chapters_from_bookmarks() -> None:
         "Chương 2. Mô hình quan hệ",
         "Chương 3. Ngôn ngữ SQL",
     ]
-    assert [(c.page_start, c.page_end) for c in chapters] == [(1, 2), (3, 4), (5, 6)]
+    assert [(c.page_start, c.page_end) for c in chapters] == [(1, 4), (5, 6), (7, 14)]
     first = chapters[0].text
     assert first.startswith("[[trang 1]]")
-    assert "[[trang 2]]" in first
     # Header lặp và footer "Trang N" đã bị loại bỏ
     assert "Giáo trình Cơ sở dữ liệu" not in first
     assert "Trang 1" not in first
 
 
-def test_allocate_questions() -> None:
-    assert allocate(10, [100, 100, 100]) in ([4, 3, 3], [3, 4, 3], [3, 3, 4])
-    assert sum(allocate(10, [5000, 1000, 1000, 1000])) == 10
-    assert allocate(10, [5000, 1000, 1000, 1000])[0] > 3
-    assert allocate(2, [10, 30, 20]) == [0, 1, 1]
-
-
-def test_full_pipeline(memory_storage: MemoryStorage) -> None:
+def test_outline_splits_chapters_into_lessons(memory_storage: MemoryStorage) -> None:
     lid = make_lecture(memory_storage)
     llm = FakeLLMClient()
     lecture = run(lid, llm, memory_storage)
     assert lecture.status == "completed"
-    assert lecture.progress_step == "quiz"
+    assert lecture.progress_step == "extracting"
+    lessons = lessons_of(lid)
+    assert [(ls.number, ls.title, ls.page_start, ls.page_end) for ls in lessons] == [
+        # Bookmark cấp 2
+        ("1.1", "1.1 Khái niệm cơ sở dữ liệu", 1, 2),
+        ("1.2", "1.2 Hệ quản trị cơ sở dữ liệu", 3, 4),
+        # Tiêu đề phụ theo cỡ chữ; phần mở đầu lấy tên chương bỏ "Chương N."
+        ("2.1", "Mô hình quan hệ", 5, 5),
+        ("2.2", "Khoá chính và khoá ngoại", 6, 6),
+        # Chương dài không tiêu đề phụ → LLM tách bài
+        ("3.1", "Bài mở đầu", 7, 10),
+        ("3.2", "Bài tiếp theo", 11, 14),
+    ]
+    assert all(ls.status == "pending" for ls in lessons)
+    assert [p for p, _ in llm.calls] == ["outline"]
+    # Chỉ tách mục lục: chưa sinh quiz
     with sync_session() as db:
-        chapters = list(db.scalars(select(Chapter).where(Chapter.lecture_id == lid)))
-        assert len(chapters) == 3
-        assert all(c.summary and c.slides for c in chapters)
-        summary = db.scalar(select(Summary).where(Summary.lecture_id == lid))
-        assert summary is not None
-        assert summary.chapters[0]["page_start"] == 1
-        assert "## Chương 1. Tổng quan về cơ sở dữ liệu" in summary.content_md
-        deck = db.scalar(select(SlideDeck).where(SlideDeck.lecture_id == lid))
-        assert deck is not None and deck.pptx_key in memory_storage.objects
-        layouts = [s["layout"] for s in deck.deck["slides"]]
-        assert layouts[:2] == ["title", "agenda"]
-        assert layouts[-1] == "summary"
-        assert layouts.count("section") == 3
-        quiz = db.scalar(select(Quiz).where(Quiz.lecture_id == lid))
-        assert quiz is not None and quiz.is_default and quiz.status == "completed"
-        questions = list(db.scalars(select(Question).where(Question.quiz_id == quiz.id)))
-        assert len(questions) == 10
-        assert sorted(q.position for q in questions) == list(range(1, 11))
-        by_idx = {c.idx: c for c in chapters}
-        for q in questions:
-            ch = by_idx[q.chapter_idx]
-            assert ch.page_start <= q.page_ref <= ch.page_end
-            # Fake luôn đặt đáp án đúng ở "Đáp án A"; sau xáo trộn answer_index vẫn trỏ đúng
-            assert q.options[q.answer_index] == "Đáp án A"
-    # 3 tóm tắt + 1 tổng quan + 3 slide + 3 quiz
-    purposes = [p for p, _ in llm.calls]
-    assert purposes.count("chapter_summary") == 3
-    assert purposes.count("overview") == 1
-    assert purposes.count("slides") == 3
-    assert purposes.count("quiz") == 3
+        assert db.scalar(select(Quiz.id).where(Quiz.lecture_id == lid)) is None
+
+
+def test_outline_is_idempotent(memory_storage: MemoryStorage) -> None:
+    lid = make_lecture(memory_storage)
+    run(lid, FakeLLMClient(), memory_storage)
+    with sync_session() as db:
+        db.get(Lecture, lid).status = "queued"  # type: ignore[union-attr]
+        db.commit()
+    llm = FakeLLMClient()
+    run(lid, llm, memory_storage)
+    assert llm.calls == []
+    assert len(lessons_of(lid)) == 6
+
+
+def test_outline_llm_failure_falls_back_to_page_chunks(memory_storage: MemoryStorage) -> None:
+    lid = make_lecture(memory_storage)
+    llm = FakeLLMClient({"OutlineLLM": ["xấu", "xấu"]})
+    assert run(lid, llm, memory_storage).status == "completed"
+    chapter3 = [ls for ls in lessons_of(lid) if ls.number.startswith("3.")]
+    assert [ls.title for ls in chapter3] == ["Ngôn ngữ SQL (phần 1)", "Ngôn ngữ SQL (phần 2)"]
 
 
 def test_scan_pdf_fails_with_no_text(memory_storage: MemoryStorage) -> None:
@@ -117,33 +135,68 @@ def test_scan_pdf_fails_with_no_text(memory_storage: MemoryStorage) -> None:
     assert lecture.error_message == "Giáo trình có vẻ là bản scan, hiện chưa được hỗ trợ."
 
 
-def test_invalid_output_is_repaired_once(memory_storage: MemoryStorage) -> None:
+def test_generate_lesson(memory_storage: MemoryStorage) -> None:
     lid = make_lecture(memory_storage)
-    # Lần đầu sai schema, lần sửa đúng → vẫn hoàn tất
-    llm = FakeLLMClient({"OverviewLLM": ['{"overview": ""}']})
-    assert run(lid, llm, memory_storage).status == "completed"
+    run(lid, FakeLLMClient(), memory_storage)
+    lesson = lessons_of(lid)[0]
+    llm = FakeLLMClient()
+    done = run_lesson(lesson.id, llm, memory_storage)
+    assert done.status == "completed"
+    assert done.progress_step == "quiz"
+    assert [p for p, _ in llm.calls] == ["lesson_summary", "slides", "quiz"]
+
+    summary = LessonSummaryLLM.model_validate(done.summary)
+    assert all(1 <= s.page_start <= s.page_end <= 2 for s in summary.sections)
+    md = summary_markdown(summary)
+    # Không có tên file/tên giáo trình
+    assert "giao-trinh-csdl-final" not in md
+    assert not md.startswith("# ")
+    assert "*(tr. 1)*" in md
+
+    deck = done.slides
+    assert deck is not None
+    layouts = [s["layout"] for s in deck["slides"]]
+    assert layouts[:2] == ["title", "agenda"] and layouts[-1] == "summary"
+    assert deck["title"] == "1.1 Khái niệm cơ sở dữ liệu"
+    assert all("tr." in b for b in deck["slides"][1]["bullets"])
+    content = [s for s in deck["slides"] if s["layout"] == "bullets"]
+    assert content and all(s.get("example") and s.get("explanation") for s in content)
+    assert done.pptx_key in memory_storage.objects
+
+    with sync_session() as db:
+        quiz = db.scalar(select(Quiz).where(Quiz.lesson_id == lesson.id))
+        assert quiz is not None and quiz.is_default and quiz.status == "completed"
+        questions = list(db.scalars(select(Question).where(Question.quiz_id == quiz.id)))
+        assert len(questions) == default_question_count(1, 2) == 5
+        for q in questions:
+            assert 1 <= q.page_ref <= 2
+            assert q.options[q.answer_index] == "Đáp án A"
 
 
-def test_invalid_output_twice_fails_and_retry_skips_done_chapters(
-    memory_storage: MemoryStorage,
-) -> None:
+def test_lesson_failure_and_retry_skip_done_steps(memory_storage: MemoryStorage) -> None:
     lid = make_lecture(memory_storage)
+    run(lid, FakeLLMClient(), memory_storage)
+    lesson = lessons_of(lid)[0]
     bad = "không phải json"
-    llm = FakeLLMClient({"OverviewLLM": [bad, bad]})
-    lecture = run(lid, llm, memory_storage)
-    assert lecture.status == "failed"
-    assert lecture.error_code == "LLM_INVALID_OUTPUT"
-    assert lecture.progress_step == "summarizing"
-    assert [p for p, _ in llm.calls].count("chapter_summary") == 3
+    failed = run_lesson(lesson.id, FakeLLMClient({"LessonSlidesLLM": [bad, bad]}), memory_storage)
+    assert failed.status == "failed"
+    assert failed.progress_step == "slides"
+    assert failed.error_code == "LLM_INVALID_OUTPUT"
+    assert failed.summary is not None
 
-    # Chạy lại: không gọi lại LLM cho các chương đã tóm tắt (ADR-0015)
+    with sync_session() as db:
+        db.get(Lesson, lesson.id).status = "queued"  # type: ignore[union-attr]
+        db.commit()
     llm2 = FakeLLMClient()
-    assert run(lid, llm2, memory_storage).status == "completed"
-    assert [p for p, _ in llm2.calls].count("chapter_summary") == 0
+    assert run_lesson(lesson.id, llm2, memory_storage).status == "completed"
+    # Tóm tắt đã có → không gọi lại (ADR-0015)
+    assert [p for p, _ in llm2.calls] == ["slides", "quiz"]
 
 
-def test_quiz_page_ref_out_of_range_is_invalid(memory_storage: MemoryStorage) -> None:
+def test_quiz_page_ref_out_of_range_fails_lesson(memory_storage: MemoryStorage) -> None:
     lid = make_lecture(memory_storage)
+    run(lid, FakeLLMClient(), memory_storage)
+    lesson = lessons_of(lid)[0]
     question = {
         "question": "?",
         "options": ["a", "b", "c", "d"],
@@ -151,54 +204,70 @@ def test_quiz_page_ref_out_of_range_is_invalid(memory_storage: MemoryStorage) ->
         "explanation": "x",
         "page_ref": 99,
     }
-    bad = {"questions": [question] * 4}
-    llm = FakeLLMClient({"QuestionSetLLM": [bad, bad]})
-    lecture = run(lid, llm, memory_storage)
-    assert lecture.status == "failed"
-    assert lecture.progress_step == "quiz"
-    assert lecture.error_code == "LLM_INVALID_OUTPUT"
+    bad = {"questions": [question] * 5}
+    done = run_lesson(lesson.id, FakeLLMClient({"QuestionSetLLM": [bad, bad]}), memory_storage)
+    assert done.status == "failed"
+    assert done.progress_step == "quiz"
     with sync_session() as db:
-        quiz = db.scalar(select(Quiz).where(Quiz.lecture_id == lid))
+        quiz = db.scalar(select(Quiz).where(Quiz.lesson_id == lesson.id))
         assert quiz is not None and quiz.status == "failed"
 
 
-def test_deleted_lecture_stops_quietly(memory_storage: MemoryStorage) -> None:
+def test_deleted_lecture_stops_lesson_quietly(memory_storage: MemoryStorage) -> None:
     lid = make_lecture(memory_storage)
+    run(lid, FakeLLMClient(), memory_storage)
+    lesson = lessons_of(lid)[0]
     llm = FakeLLMClient()
 
     def delete_during_summary(purpose: str, _: str) -> None:
-        if purpose == "overview":
+        if purpose == "lesson_summary":
             with sync_session() as db:
                 db.delete(db.get(Lecture, lid))
                 db.commit()
 
     llm.on_call = delete_during_summary
     with sync_session() as db:
-        LecturePipeline(db, llm, memory_storage).run(lid)
+        LecturePipeline(db, llm, memory_storage).run_lesson(lesson.id)
     with sync_session() as db:
         assert db.get(Lecture, lid) is None
+        assert db.scalar(select(Chapter.id).where(Chapter.lecture_id == lid)) is None
     assert "slides" not in [p for p, _ in llm.calls]
 
 
-@pytest.mark.parametrize("status", ["completed"])
-def test_completed_lecture_is_skipped(memory_storage: MemoryStorage, status: str) -> None:
-    lid = make_lecture(memory_storage)
-    with sync_session() as db:
-        db.get(Lecture, lid).status = status  # type: ignore[union-attr]
-        db.commit()
-    llm = FakeLLMClient()
-    run(lid, llm, memory_storage)
-    assert llm.calls == []
+def test_allocate_and_default_count() -> None:
+    assert allocate(10, [100, 100, 100]) in ([4, 3, 3], [3, 4, 3], [3, 3, 4])
+    assert sum(allocate(10, [5000, 1000, 1000, 1000])) == 10
+    assert allocate(2, [10, 30, 20]) == [0, 1, 1]
+    assert default_question_count(1, 1) == 5
+    assert default_question_count(1, 6) == 9
+    assert default_question_count(1, 20) == 15
 
 
-def test_long_bullets_are_clipped_not_rejected() -> None:
+def test_long_slide_fields_are_clipped_not_rejected() -> None:
     long = "Consistency (tính nhất quán): giao dịch đưa cơ sở dữ liệu từ trạng thái hợp lệ " * 3
-    out = ChapterSlidesLLM.model_validate(
-        {"slides": [{"title": "T" * 100, "bullets": [long] * 8, "page_refs": [1]}] * 4}
-    )
-    assert len(out.slides) == 3
-    slide = out.slides[0]
-    assert len(slide.title) <= 80
-    assert len(slide.bullets) == 6
-    assert all(len(b) <= 120 and b.endswith("…") for b in slide.bullets)
+    slide = {
+        "title": "T" * 100,
+        "bullets": [long] * 8,
+        "explanation": long * 3,
+        "example": long * 5,
+        "page_refs": [1],
+    }
+    out = LessonSlidesLLM.model_validate({"slides": [slide] * 14, "takeaways": [long] * 9})
+    assert len(out.slides) == 12
+    first = out.slides[0]
+    assert len(first.title) <= 80
+    assert len(first.bullets) == 5
+    assert all(len(b) <= 120 and b.endswith("…") for b in first.bullets)
+    assert first.explanation and len(first.explanation) <= 300
+    assert first.example and len(first.example) <= 400
+    assert len(out.takeaways) == 6
     assert clip("ngắn", 120) == "ngắn"
+
+
+def test_section_pages_are_clamped() -> None:
+    sections = [
+        LessonSection(title="B", page_start=9, page_end=12, key_points=["x"]),
+        LessonSection(title="A", page_start=0, page_end=3, key_points=["x"]),
+    ]
+    fixed = _clamp_sections(sections, 2, 5)
+    assert [(s.title, s.page_start, s.page_end) for s in fixed] == [("A", 2, 3), ("B", 5, 5)]

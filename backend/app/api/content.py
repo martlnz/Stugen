@@ -1,78 +1,49 @@
-"""Tóm tắt, slide, quiz gắn với một bài giảng: /lectures/{id}/summary|slides|slides.pptx|quizzes."""
-
-import asyncio
+"""Mục lục, chọn bài để tạo học liệu, quiz tổng hợp của một bài giảng (ADR-0017)."""
 
 from fastapi import APIRouter, Depends
-from fastapi.responses import Response, StreamingResponse
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.lectures import content_disposition, owned_lecture
+from app.api.lectures import owned_lecture
 from app.core.deps import get_current_user
-from app.core.errors import AppError
-from app.db.models import Lecture, SlideDeck, Summary, User
+from app.db.models import Lecture, User
 from app.db.session import get_db
-from app.schemas.content import QuizCreate, QuizList, QuizSummary, SlidesOut, SummaryOut
+from app.schemas.content import (
+    GenerateLessons,
+    LectureQuizCreate,
+    OutlineOut,
+    QuizList,
+    QuizSummary,
+)
+from app.schemas.lecture import LectureOut
+from app.services import lectures as lecture_service
+from app.services import lessons as lesson_service
 from app.services import quizzes as quiz_service
-from app.services.storage import ObjectNotFound, get_storage
 
 router = APIRouter(prefix="/lectures/{lecture_id}", tags=["content"])
 
-PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
-
-def not_ready() -> AppError:
-    return AppError("LECTURE_NOT_READY", "Nội dung chưa được tạo xong.", 409)
-
-
-@router.get("/summary", response_model=SummaryOut)
-async def get_summary(
+@router.get("/outline", response_model=OutlineOut)
+async def get_outline(
     lecture: Lecture = Depends(owned_lecture), db: AsyncSession = Depends(get_db)
-) -> SummaryOut:
-    summary = await db.scalar(select(Summary).where(Summary.lecture_id == lecture.id))
-    if summary is None:
-        raise not_ready()
-    return SummaryOut.model_validate(summary, from_attributes=True)
+) -> OutlineOut:
+    return await lesson_service.outline(db, lecture)
 
 
-@router.get("/slides", response_model=SlidesOut)
-async def get_slides(
+@router.post("/lessons/generate", status_code=202, response_model=OutlineOut)
+async def generate_lessons(
+    body: GenerateLessons,
+    lecture: Lecture = Depends(owned_lecture),
+    db: AsyncSession = Depends(get_db),
+) -> OutlineOut:
+    return await lesson_service.generate(db, lecture, body.lesson_ids)
+
+
+@router.post("/regenerate", status_code=202, response_model=LectureOut)
+async def regenerate(
     lecture: Lecture = Depends(owned_lecture), db: AsyncSession = Depends(get_db)
-) -> SlidesOut:
-    deck = await db.scalar(select(SlideDeck).where(SlideDeck.lecture_id == lecture.id))
-    if deck is None:
-        raise not_ready()
-    return SlidesOut(
-        lecture_id=lecture.id,
-        deck=deck.deck,  # type: ignore[arg-type]
-        pptx_available=deck.pptx_key is not None,
-        created_at=deck.created_at,
-    )
-
-
-@router.get(
-    "/slides.pptx",
-    response_class=StreamingResponse,
-    responses={200: {"content": {PPTX_TYPE: {}}}},
-)
-async def download_pptx(
-    lecture: Lecture = Depends(owned_lecture), db: AsyncSession = Depends(get_db)
-) -> Response:
-    key = await db.scalar(select(SlideDeck.pptx_key).where(SlideDeck.lecture_id == lecture.id))
-    if not key:
-        raise not_ready()
-    try:
-        obj = await asyncio.to_thread(get_storage().open, key)
-    except ObjectNotFound:
-        raise not_ready() from None
-    return StreamingResponse(
-        obj.body,
-        media_type=PPTX_TYPE,
-        headers={
-            "Content-Length": str(obj.length),
-            "Content-Disposition": content_disposition("attachment", f"{lecture.title}.pptx"),
-        },
-    )
+) -> LectureOut:
+    await lecture_service.regenerate_lecture(db, lecture)
+    return await lecture_service.lecture_out(db, lecture)
 
 
 @router.get("/quizzes", response_model=QuizList)
@@ -85,11 +56,12 @@ async def list_quizzes(
 
 
 @router.post("/quizzes", status_code=202, response_model=QuizSummary)
-async def create_quiz(
-    body: QuizCreate | None = None,
+async def create_scope_quiz(
+    body: LectureQuizCreate,
     lecture: Lecture = Depends(owned_lecture),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> QuizSummary:
-    num = body.num_questions if body else 10
-    return await quiz_service.create_quiz(db, user, lecture, num)
+    return await quiz_service.create_scope_quiz(
+        db, user, lecture, body.num_questions, body.lesson_ids
+    )

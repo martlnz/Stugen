@@ -31,8 +31,9 @@ async def test_upload_creates_queued_lecture(
     body = await upload(client_a)
     assert body["status"] == "queued"
     assert body["title"] == "Nhập môn Cơ sở dữ liệu"  # lấy từ metadata PDF
-    assert body["page_count"] == 6
-    assert body["available"] == {"summary": False, "slides": False, "pptx": False, "quiz": False}
+    assert body["page_count"] == 14
+    assert body["lessons"] == {"total": 0, "completed": 0, "processing": 0, "failed": 0}
+    assert body["needs_regenerate"] is False
     assert len(memory_storage.objects) == 1
     assert len(no_enqueue) == 1
 
@@ -114,11 +115,8 @@ async def test_other_users_lecture_is_404(client_a: AsyncClient, client_b: Async
         ("DELETE", f"/api/lectures/{lid}"),
         ("POST", f"/api/lectures/{lid}/retry"),
         ("GET", f"/api/lectures/{lid}/pdf"),
-        ("GET", f"/api/lectures/{lid}/summary"),
-        ("GET", f"/api/lectures/{lid}/slides"),
-        ("GET", f"/api/lectures/{lid}/slides.pptx"),
+        ("GET", f"/api/lectures/{lid}/outline"),
         ("GET", f"/api/lectures/{lid}/quizzes"),
-        ("POST", f"/api/lectures/{lid}/quizzes"),
     ]:
         kwargs = {"json": {"title": "x"}} if method == "PATCH" else {}
         res = await client_b.request(method, path, **kwargs)

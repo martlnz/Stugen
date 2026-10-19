@@ -1,6 +1,6 @@
 # ADR-0015: Làm rõ pipeline LLM – thử lại, slide, schema chương, ngôn ngữ, lưu kết quả theo chương
 
-- **Trạng thái:** Chấp nhận
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0017](0017-bai-nho-chon-pham-vi-slide-tu-van-ban-goc.md)
 - **Ngày:** 2026-10-18
 - **Sửa đổi một phần:** ADR-0008, ADR-0010, ADR-0011
 

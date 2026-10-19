@@ -134,10 +134,54 @@ class Chapter(UUIDPk, Base):
     page_end: Mapped[int]
     text: Mapped[str] = mapped_column(Text)
     char_count: Mapped[int]
+    # Không còn sinh từ ADR-0017 (giữ cho dữ liệu cũ); kết quả nằm ở bảng lessons
     summary: Mapped[dict[str, Any] | None]
     slides: Mapped[list[Any] | None]
 
     lecture: Mapped[Lecture] = relationship(back_populates="chapters")
+    lessons: Mapped[list["Lesson"]] = relationship(
+        back_populates="chapter", order_by="Lesson.idx", passive_deletes=True
+    )
+
+
+LESSON_STATUSES = ("pending", "queued", "processing", "completed", "failed")
+LESSON_STEPS = ("summarizing", "slides", "quiz")
+
+
+class Lesson(UUIDPk, Base):
+    """Bài nhỏ (2–8 trang) trong một chương; đơn vị tạo học liệu (ADR-0017)."""
+
+    __tablename__ = "lessons"
+    __table_args__ = (
+        UniqueConstraint("lecture_id", "idx"),
+        CheckConstraint("idx >= 0", name="idx_nonneg"),
+        CheckConstraint("page_end >= page_start", name="page_range"),
+        CheckConstraint(_in("status", LESSON_STATUSES), name="status_valid"),
+        CheckConstraint(_in("progress_step", LESSON_STEPS), name="progress_step_valid"),
+        Index("ix_lessons_chapter_idx", "chapter_id", "idx"),
+    )
+
+    lecture_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lectures.id", ondelete="CASCADE"))
+    chapter_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("chapters.id", ondelete="CASCADE"))
+    idx: Mapped[int]
+    number: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(Text)
+    page_start: Mapped[int]
+    page_end: Mapped[int]
+    text: Mapped[str] = mapped_column(Text)
+    char_count: Mapped[int]
+    status: Mapped[str] = mapped_column(Text, server_default="pending", default="pending")
+    progress_step: Mapped[str | None] = mapped_column(Text)
+    error_code: Mapped[str | None] = mapped_column(Text)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    summary: Mapped[dict[str, Any] | None]
+    slides: Mapped[dict[str, Any] | None]
+    pptx_key: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        server_default=func.now(), default=utcnow, onupdate=utcnow
+    )
+
+    chapter: Mapped[Chapter] = relationship(back_populates="lessons")
 
 
 class Summary(UUIDPk, Base):
@@ -168,11 +212,17 @@ class Quiz(UUIDPk, Base):
     __tablename__ = "quizzes"
     __table_args__ = (
         CheckConstraint(_in("status", LECTURE_STATUSES), name="status_valid"),
-        CheckConstraint("num_questions IN (10, 20, 30)", name="num_questions_valid"),
+        CheckConstraint("num_questions BETWEEN 1 AND 30", name="num_questions_valid"),
         Index("ix_quizzes_lecture_created", "lecture_id", text("created_at DESC")),
     )
 
     lecture_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("lectures.id", ondelete="CASCADE"))
+    # Quiz của một bài (ADR-0017); NULL với quiz tổng hợp hoặc quiz cũ
+    lesson_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("lessons.id", ondelete="CASCADE"), index=True
+    )
+    # Phạm vi quiz tổng hợp: danh sách lesson_id (chuỗi)
+    lesson_ids: Mapped[list[Any] | None]
     status: Mapped[str] = mapped_column(Text, server_default="queued", default="queued")
     num_questions: Mapped[int]
     is_default: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)

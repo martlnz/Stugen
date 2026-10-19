@@ -31,6 +31,7 @@ class AppError(Exception):
 LECTURE_NOT_FOUND = ("LECTURE_NOT_FOUND", "Không tìm thấy bài giảng.")
 QUIZ_NOT_FOUND = ("QUIZ_NOT_FOUND", "Không tìm thấy quiz.")
 ATTEMPT_NOT_FOUND = ("ATTEMPT_NOT_FOUND", "Không tìm thấy lần làm bài.")
+LESSON_NOT_FOUND = ("LESSON_NOT_FOUND", "Không tìm thấy bài học.")
 
 _HTTP_CODES = {
     401: ("UNAUTHENTICATED", "Bạn cần đăng nhập."),

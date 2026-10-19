@@ -14,6 +14,7 @@ celery_app.conf.update(
     task_default_queue="default",
     task_routes={
         "app.worker.tasks.process_lecture": {"queue": "ai"},
+        "app.worker.tasks.generate_lesson": {"queue": "ai"},
         "app.worker.tasks.generate_quiz": {"queue": "ai"},
     },
     broker_connection_retry_on_startup=True,

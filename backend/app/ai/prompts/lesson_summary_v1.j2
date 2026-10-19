@@ -1,0 +1,17 @@
+Tóm tắt bài học sau.
+
+Bài: {{ lesson_title }} (trang {{ page_start }}–{{ page_end }})
+
+Yêu cầu:
+- overview: 2–4 câu khái quát bài học. Không nhắc tên file hay tên giáo trình, đi thẳng vào kiến thức.
+- sections: chia bài thành {{ min_sections }}–{{ max_sections }} mục nhỏ theo đúng thứ tự trình bày, phủ TOÀN BỘ nội dung bài, không bỏ sót phần nào.
+  - title: tên mục nêu đúng kiến thức chính của mục (dưới 70 ký tự).
+  - page_start, page_end: trang bắt đầu/kết thúc của mục theo đánh dấu [[trang N]], trong khoảng {{ page_start }}–{{ page_end }}.
+  - key_points: 2–5 ý chính của mục, mỗi ý là một câu hoàn chỉnh, đủ để ôn tập mà không cần đọc lại giáo trình.
+- terms: tối đa 8 thuật ngữ quan trọng kèm định nghĩa ngắn (có thể rỗng).
+{% if content_language == "vi" %}- Viết bằng tiếng Việt.{% endif %}
+
+Văn bản bài học:
+"""
+{{ lesson_text }}
+"""

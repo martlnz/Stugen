@@ -1,14 +1,23 @@
-"""Sinh quiz theo chương (ADR-0012): phân bổ theo độ dài, kiểm tra trang, xáo trộn đáp án."""
+"""Sinh quiz theo bài (ADR-0012, ADR-0017): phân bổ theo độ dài, kiểm tra trang, xáo đáp án."""
 
 import random
 from dataclasses import dataclass
+from typing import Protocol
 
 from app.ai.llm import LLMClient
 from app.ai.prompting import render, system_prompt
-from app.db.models import Chapter
-from app.schemas.llm import QuestionLLM, QuestionSetLLM
+from app.schemas.llm import LessonSection, QuestionLLM, QuestionSetLLM
 
-MAX_CHAPTER_PROMPT_CHARS = 30_000
+MIN_LESSON_QUESTIONS = 5
+MAX_LESSON_QUESTIONS = 15
+
+
+class QuizSource(Protocol):
+    idx: int
+    title: str
+    page_start: int
+    page_end: int
+    text: str
 
 
 @dataclass
@@ -18,16 +27,22 @@ class GeneratedQuestion:
     answer_index: int
     explanation: str
     page_ref: int
-    chapter_idx: int
+    source_idx: int
+
+
+def default_question_count(page_start: int, page_end: int) -> int:
+    """Quiz mặc định của bài: ~1,5 câu/trang, 5–15 câu (ADR-0017)."""
+    pages = page_end - page_start + 1
+    return min(MAX_LESSON_QUESTIONS, max(MIN_LESSON_QUESTIONS, round(pages * 1.5)))
 
 
 def allocate(total: int, sizes: list[int]) -> list[int]:
-    """Chia `total` câu cho các chương tỉ lệ theo độ dài; mỗi chương ≥ 1 câu nếu đủ câu."""
+    """Chia `total` câu cho các phần tỉ lệ theo độ dài; mỗi phần ≥ 1 câu nếu đủ câu."""
     n = len(sizes)
     if n == 0:
         return []
     if total < n:
-        # Không đủ cho mọi chương: ưu tiên các chương dài nhất
+        # Không đủ cho mọi phần: ưu tiên các phần dài nhất
         top = sorted(range(n), key=lambda i: -sizes[i])[:total]
         return [1 if i in top else 0 for i in range(n)]
     counts = [1] * n
@@ -51,33 +66,33 @@ def shuffle_options(q: QuestionLLM, rng: random.Random) -> tuple[list[str], int]
     return options, order.index(q.answer_index)
 
 
-def questions_for_chapter(
+def questions_for_source(
     llm: LLMClient,
-    lecture_title: str,
-    chapter: Chapter,
+    source: QuizSource,
     count: int,
     avoid: list[str],
     rng: random.Random,
+    sections: list[LessonSection] | None = None,
 ) -> list[GeneratedQuestion]:
     def check(result: QuestionSetLLM) -> None:
         if len(result.questions) < count:
             raise ValueError(f"Cần {count} câu hỏi nhưng chỉ có {len(result.questions)}")
         for i, q in enumerate(result.questions[:count], start=1):
-            if not chapter.page_start <= q.page_ref <= chapter.page_end:
+            if not source.page_start <= q.page_ref <= source.page_end:
                 raise ValueError(
                     f"Câu {i}: page_ref {q.page_ref} nằm ngoài khoảng "
-                    f"{chapter.page_start}–{chapter.page_end}"
+                    f"{source.page_start}–{source.page_end}"
                 )
 
     user = render(
-        "quiz_v1",
-        lecture_title=lecture_title,
-        chapter_title=chapter.title,
-        page_start=chapter.page_start,
-        page_end=chapter.page_end,
+        "lesson_quiz_v1",
+        lesson_title=source.title,
+        page_start=source.page_start,
+        page_end=source.page_end,
         count=count,
+        sections=sections or [],
         avoid=avoid[-30:],
-        chapter_text=chapter.text[:MAX_CHAPTER_PROMPT_CHARS],
+        lesson_text=source.text,
     )
     result = llm.generate_json(
         system_prompt(), user, QuestionSetLLM, purpose="quiz", validate=check
@@ -92,7 +107,7 @@ def questions_for_chapter(
                 answer_index=answer,
                 explanation=q.explanation,
                 page_ref=q.page_ref,
-                chapter_idx=chapter.idx,
+                source_idx=source.idx,
             )
         )
     return generated

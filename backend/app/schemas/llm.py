@@ -1,4 +1,8 @@
-"""Schema đầu ra LLM (ADR-0010, 0011, 0012, 0015) và cấu trúc JSONB lưu DB."""
+"""Schema đầu ra LLM (ADR-0010, 0011, 0012, 0015, 0017) và cấu trúc JSONB lưu DB.
+
+Giới hạn hiển thị (độ dài, số phần tử) do code cắt gọn trong validator `mode="before"`;
+lỗi cấu trúc vẫn được sửa 1 lần (ADR-0015).
+"""
 
 from typing import Any, Literal
 
@@ -6,6 +10,8 @@ from pydantic import BaseModel, Field, field_validator
 
 MAX_BULLET = 120
 MAX_SLIDE_TITLE = 80
+MAX_EXPLANATION = 300
+MAX_EXAMPLE = 400
 
 
 def clip(text: str, limit: int) -> str:
@@ -31,23 +37,79 @@ def _clip_all(v: Any, limit: int) -> Any:
     return v
 
 
+def _clip_opt(v: Any, limit: int) -> Any:
+    if isinstance(v, str):
+        v = clip(v, limit)
+        return v or None
+    return v
+
+
+# ---------- Tách bài (outline) ----------
+
+
+class OutlineLessonLLM(BaseModel):
+    title: str = Field(min_length=1, description="Tên bài nêu đúng nội dung chính")
+    start_page: int = Field(description="Trang bắt đầu bài, theo đánh dấu [[trang N]]")
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _fit(cls, v: Any) -> Any:
+        return clip(v, MAX_SLIDE_TITLE) if isinstance(v, str) else v
+
+
+class OutlineLLM(BaseModel):
+    chapter_title: str = Field(min_length=1, description="Tên chương ngắn gọn theo nội dung")
+    lessons: list[OutlineLessonLLM] = Field(min_length=1)
+
+    @field_validator("chapter_title", mode="before")
+    @classmethod
+    def _fit(cls, v: Any) -> Any:
+        return clip(v, MAX_SLIDE_TITLE) if isinstance(v, str) else v
+
+    @field_validator("lessons", mode="before")
+    @classmethod
+    def _cap(cls, v: Any) -> Any:
+        return _take(v, 12)
+
+
+# ---------- Tóm tắt bài ----------
+
+
 class Term(BaseModel):
     term: str = Field(min_length=1, description="Thuật ngữ, giữ nguyên gốc")
     definition: str = Field(min_length=1, description="Định nghĩa ngắn gọn")
 
 
-class ChapterSummaryLLM(BaseModel):
-    """Đầu ra LLM cho một chương; lưu ở chapters.summary."""
-
+class LessonSection(BaseModel):
+    title: str = Field(min_length=1, description="Tên mục nhỏ")
+    page_start: int = Field(description="Trang bắt đầu của mục")
+    page_end: int = Field(description="Trang kết thúc của mục")
     key_points: list[str] = Field(
-        min_length=1, max_length=8, description="Ý chính của chương, mỗi ý một câu hoàn chỉnh"
+        min_length=1, description="Ý chính của mục, mỗi ý một câu hoàn chỉnh"
     )
-    terms: list[Term] = Field(default_factory=list, max_length=10)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _fit_title(cls, v: Any) -> Any:
+        return clip(v, 100) if isinstance(v, str) else v
 
     @field_validator("key_points", mode="before")
     @classmethod
-    def _cap_points(cls, v: Any) -> Any:
-        return _take(v, 8)
+    def _cap(cls, v: Any) -> Any:
+        return _take(v, 6)
+
+
+class LessonSummaryLLM(BaseModel):
+    """Đầu ra LLM khi tóm tắt một bài; lưu ở lessons.summary sau khi code kẹp số trang."""
+
+    overview: str = Field(min_length=1, description="2–4 câu khái quát nội dung bài")
+    sections: list[LessonSection] = Field(min_length=1)
+    terms: list[Term] = Field(default_factory=list)
+
+    @field_validator("sections", mode="before")
+    @classmethod
+    def _cap_sections(cls, v: Any) -> Any:
+        return _take(v, 10)
 
     @field_validator("terms", mode="before")
     @classmethod
@@ -55,25 +117,7 @@ class ChapterSummaryLLM(BaseModel):
         return _take(v, 10)
 
 
-class ChapterSummary(ChapterSummaryLLM):
-    """Lưu ở summaries.chapters; idx/title/page_* do code ghép từ bảng chapters."""
-
-    idx: int
-    title: str
-    page_start: int
-    page_end: int
-
-
-class OverviewLLM(BaseModel):
-    overview: str = Field(min_length=1, description="Đoạn tổng quan toàn bộ giáo trình")
-    learning_objectives: list[str] = Field(
-        min_length=1, max_length=6, description="Mục tiêu học tập, mỗi mục tối đa 120 ký tự"
-    )
-
-    @field_validator("learning_objectives", mode="before")
-    @classmethod
-    def _fit(cls, v: Any) -> Any:
-        return _clip_all(_take(v, 6), MAX_BULLET)
+# ---------- Slide ----------
 
 
 def _check_bullets(v: list[str]) -> list[str]:
@@ -85,9 +129,11 @@ def _check_bullets(v: list[str]) -> list[str]:
 
 class Slide(BaseModel):
     layout: Literal["title", "agenda", "section", "bullets", "summary"]
-    title: str = Field(max_length=80)
+    title: str = Field(max_length=MAX_SLIDE_TITLE)
     subtitle: str | None = None
-    bullets: list[str] = Field(default_factory=list, max_length=6)
+    bullets: list[str] = Field(default_factory=list, max_length=8)
+    explanation: str | None = Field(default=None, max_length=MAX_EXPLANATION)
+    example: str | None = Field(default=None, max_length=MAX_EXAMPLE)
     notes: str | None = None
     page_refs: list[int] = Field(default_factory=list)
 
@@ -100,11 +146,13 @@ class SlideDeck(BaseModel):
     slides: list[Slide]
 
 
-class ContentSlideLLM(BaseModel):
-    title: str = Field(min_length=1, max_length=80, description="Tiêu đề slide ngắn")
-    bullets: list[str] = Field(
-        min_length=1, max_length=6, description="Gạch đầu dòng ngắn gọn dạng ý"
+class LessonSlideLLM(BaseModel):
+    title: str = Field(min_length=1, description="Tiêu đề nêu đúng kiến thức chính của slide")
+    bullets: list[str] = Field(min_length=1, description="2–5 ý ngắn gọn")
+    explanation: str | None = Field(
+        default=None, description="Giải thích dễ hiểu bằng lời thường, 1–3 câu"
     )
+    example: str | None = Field(default=None, description="Ví dụ cụ thể minh hoạ kiến thức")
     notes: str | None = Field(default=None, description="Ghi chú cho người thuyết trình")
     page_refs: list[int] = Field(default_factory=list, description="Số trang tham chiếu")
 
@@ -116,16 +164,35 @@ class ContentSlideLLM(BaseModel):
     @field_validator("bullets", mode="before")
     @classmethod
     def _fit_bullets(cls, v: Any) -> Any:
-        return _clip_all(_take(v, 6), MAX_BULLET)
+        return _clip_all(_take(v, 5), MAX_BULLET)
+
+    @field_validator("explanation", mode="before")
+    @classmethod
+    def _fit_explanation(cls, v: Any) -> Any:
+        return _clip_opt(v, MAX_EXPLANATION)
+
+    @field_validator("example", mode="before")
+    @classmethod
+    def _fit_example(cls, v: Any) -> Any:
+        return _clip_opt(v, MAX_EXAMPLE)
 
 
-class ChapterSlidesLLM(BaseModel):
-    slides: list[ContentSlideLLM] = Field(min_length=1, max_length=3)
+class LessonSlidesLLM(BaseModel):
+    slides: list[LessonSlideLLM] = Field(min_length=1)
+    takeaways: list[str] = Field(min_length=1, description="3–5 điều cần ghi nhớ")
 
     @field_validator("slides", mode="before")
     @classmethod
     def _cap(cls, v: Any) -> Any:
-        return _take(v, 3)
+        return _take(v, 12)
+
+    @field_validator("takeaways", mode="before")
+    @classmethod
+    def _fit_takeaways(cls, v: Any) -> Any:
+        return _clip_all(_take(v, 6), MAX_BULLET)
+
+
+# ---------- Quiz ----------
 
 
 class QuestionLLM(BaseModel):

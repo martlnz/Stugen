@@ -1,6 +1,6 @@
 # ADR-0011: Slide lưu dạng JSON trung gian, render bằng Reveal.js, xuất PPTX bằng python-pptx
 
-- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0015](0015-lam-ro-pipeline-llm.md)
+- **Trạng thái:** Chấp nhận · Sửa đổi một phần bởi [ADR-0015](0015-lam-ro-pipeline-llm.md), [ADR-0017](0017-bai-nho-chon-pham-vi-slide-tu-van-ban-goc.md)
 - **Ngày:** 2026-10-18
 
 ## Bối cảnh

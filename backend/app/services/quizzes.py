@@ -4,7 +4,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import ATTEMPT_NOT_FOUND, QUIZ_NOT_FOUND, AppError
-from app.db.models import Chapter, Lecture, Question, Quiz, QuizAttempt, User
+from app.db.models import Chapter, Lecture, Lesson, Question, Quiz, QuizAttempt, User
 from app.schemas.content import (
     AttemptListItem,
     AttemptResult,
@@ -23,6 +23,15 @@ def _uuid_or_404(value: str, err: tuple[str, str]) -> uuid.UUID:
         return uuid.UUID(value)
     except ValueError:
         raise AppError(*err, 404) from None
+
+
+def _validation(field: str, message: str) -> AppError:
+    return AppError(
+        "VALIDATION_ERROR",
+        "Dữ liệu không hợp lệ.",
+        422,
+        errors=[{"field": field, "message": message}],
+    )
 
 
 async def get_owned_quiz(db: AsyncSession, user: User, quiz_id: str) -> tuple[Quiz, Lecture]:
@@ -66,6 +75,8 @@ async def _summaries(db: AsyncSession, quizzes: list[Quiz], user: User) -> list[
             QuizSummary(
                 id=q.id,
                 lecture_id=q.lecture_id,
+                lesson_id=q.lesson_id,
+                lesson_ids=[uuid.UUID(i) for i in q.lesson_ids] if q.lesson_ids else None,
                 status=q.status,  # type: ignore[arg-type]
                 num_questions=q.num_questions,
                 is_default=q.is_default,
@@ -79,28 +90,75 @@ async def _summaries(db: AsyncSession, quizzes: list[Quiz], user: User) -> list[
     return items
 
 
-async def list_quizzes(db: AsyncSession, user: User, lecture: Lecture) -> list[QuizSummary]:
-    quizzes = list(
-        await db.scalars(
-            select(Quiz).where(Quiz.lecture_id == lecture.id).order_by(Quiz.created_at.desc())
-        )
-    )
+async def list_quizzes(
+    db: AsyncSession, user: User, lecture: Lecture, lesson: Lesson | None = None
+) -> list[QuizSummary]:
+    stmt = select(Quiz).where(Quiz.lecture_id == lecture.id)
+    if lesson is not None:
+        stmt = stmt.where(Quiz.lesson_id == lesson.id)
+    quizzes = list(await db.scalars(stmt.order_by(Quiz.created_at.desc())))
     return await _summaries(db, quizzes, user)
 
 
-async def create_quiz(
-    db: AsyncSession, user: User, lecture: Lecture, num_questions: int
-) -> QuizSummary:
-    has_chapters = await db.scalar(
-        select(func.count()).select_from(Chapter).where(Chapter.lecture_id == lecture.id)
-    )
-    if not has_chapters:
-        raise AppError("LECTURE_NOT_READY", "Bài giảng chưa xử lý xong.", 409)
-    quiz = Quiz(lecture_id=lecture.id, num_questions=num_questions, status="queued")
+async def _queue(db: AsyncSession, user: User, quiz: Quiz) -> QuizSummary:
     db.add(quiz)
     await db.commit()
     enqueue_generate_quiz(quiz.id)
     return (await _summaries(db, [quiz], user))[0]
+
+
+async def create_lesson_quiz(
+    db: AsyncSession, user: User, lesson: Lesson, num_questions: int
+) -> QuizSummary:
+    if lesson.summary is None:
+        raise AppError("LESSON_NOT_READY", "Bài học chưa được tạo nội dung.", 409)
+    quiz = Quiz(
+        lecture_id=lesson.lecture_id,
+        lesson_id=lesson.id,
+        num_questions=num_questions,
+        status="queued",
+    )
+    return await _queue(db, user, quiz)
+
+
+async def create_scope_quiz(
+    db: AsyncSession,
+    user: User,
+    lecture: Lecture,
+    num_questions: int,
+    lesson_ids: list[uuid.UUID],
+) -> QuizSummary:
+    """Quiz tổng hợp trên các bài người dùng chọn (đã tạo học liệu)."""
+    lessons = list(
+        await db.scalars(
+            select(Lesson).where(Lesson.lecture_id == lecture.id, Lesson.id.in_(lesson_ids))
+        )
+    )
+    if len(lessons) != len(set(lesson_ids)):
+        raise _validation("lesson_ids", "Có bài không thuộc bài giảng này.")
+    if any(lesson.summary is None for lesson in lessons):
+        raise AppError("LESSON_NOT_READY", "Chỉ chọn được các bài đã tạo học liệu.", 409)
+    quiz = Quiz(
+        lecture_id=lecture.id,
+        lesson_ids=[str(lesson.id) for lesson in sorted(lessons, key=lambda x: x.idx)],
+        num_questions=num_questions,
+        status="queued",
+    )
+    return await _queue(db, user, quiz)
+
+
+async def _scope(db: AsyncSession, quiz: Quiz) -> tuple[str, dict[int, str]]:
+    """(tên phạm vi, idx → tên bài/chương) để hiển thị và chấm điểm theo bài."""
+    if quiz.lesson_id or quiz.lesson_ids:
+        ids = [quiz.lesson_id] if quiz.lesson_id else [uuid.UUID(i) for i in quiz.lesson_ids or []]
+        lessons = list(await db.scalars(select(Lesson).where(Lesson.id.in_(ids))))
+        names = {ls.idx: f"{ls.number} {ls.title}" for ls in lessons}
+        if quiz.lesson_id and lessons:
+            return f"Bài {lessons[0].number}: {lessons[0].title}", names
+        return f"Quiz tổng hợp {len(ids)} bài", names
+    # Quiz định dạng cũ: chapter_idx là chỉ số chương
+    chapters = await db.scalars(select(Chapter).where(Chapter.lecture_id == quiz.lecture_id))
+    return "Toàn bài giảng", {c.idx: c.title for c in chapters}
 
 
 async def quiz_detail(db: AsyncSession, quiz: Quiz, lecture: Lecture) -> QuizDetail:
@@ -109,10 +167,13 @@ async def quiz_detail(db: AsyncSession, quiz: Quiz, lecture: Lecture) -> QuizDet
     questions = await db.scalars(
         select(Question).where(Question.quiz_id == quiz.id).order_by(Question.position)
     )
+    scope_title, _ = await _scope(db, quiz)
     return QuizDetail(
         id=quiz.id,
         lecture_id=lecture.id,
         lecture_title=lecture.title,
+        lesson_id=quiz.lesson_id,
+        scope_title=scope_title,
         num_questions=quiz.num_questions,
         questions=[
             QuestionPublic(
@@ -132,18 +193,17 @@ async def delete_quiz(db: AsyncSession, quiz: Quiz) -> None:
     await db.commit()
 
 
-async def _result(db: AsyncSession, attempt: QuizAttempt, lecture: Lecture) -> AttemptResult:
+async def _result(
+    db: AsyncSession, attempt: QuizAttempt, quiz: Quiz, lecture: Lecture
+) -> AttemptResult:
     questions = list(
         await db.scalars(
             select(Question).where(Question.quiz_id == attempt.quiz_id).order_by(Question.position)
         )
     )
-    chapters = {
-        c.idx: c.title
-        for c in await db.scalars(select(Chapter).where(Chapter.lecture_id == lecture.id))
-    }
+    scope_title, names = await _scope(db, quiz)
     results: list[QuestionResult] = []
-    by_chapter: dict[int, list[int]] = {}
+    by_unit: dict[int, list[int]] = {}
     for q in questions:
         selected = attempt.answers.get(str(q.id))
         correct = selected == q.answer_index
@@ -160,7 +220,7 @@ async def _result(db: AsyncSession, attempt: QuizAttempt, lecture: Lecture) -> A
                 page_ref=q.page_ref,
             )
         )
-        bucket = by_chapter.setdefault(q.chapter_idx, [0, 0])
+        bucket = by_unit.setdefault(q.chapter_idx, [0, 0])
         bucket[0] += int(correct)
         bucket[1] += 1
     return AttemptResult(
@@ -168,25 +228,18 @@ async def _result(db: AsyncSession, attempt: QuizAttempt, lecture: Lecture) -> A
         quiz_id=attempt.quiz_id,
         lecture_id=lecture.id,
         lecture_title=lecture.title,
+        lesson_id=quiz.lesson_id,
+        scope_title=scope_title,
         score=attempt.score,
         total=attempt.total,
         created_at=attempt.created_at,
         results=results,
         by_chapter=[
             ChapterScore(
-                chapter_idx=idx, title=chapters.get(idx, f"Chương {idx + 1}"), correct=c, total=t
+                chapter_idx=idx, title=names.get(idx, f"Phần {idx + 1}"), correct=c, total=t
             )
-            for idx, (c, t) in sorted(by_chapter.items())
+            for idx, (c, t) in sorted(by_unit.items())
         ],
-    )
-
-
-def _validation(field: str, message: str) -> AppError:
-    return AppError(
-        "VALIDATION_ERROR",
-        "Dữ liệu không hợp lệ.",
-        422,
-        errors=[{"field": field, "message": message}],
     )
 
 
@@ -214,7 +267,7 @@ async def submit_attempt(
     )
     db.add(attempt)
     await db.commit()
-    return await _result(db, attempt, lecture)
+    return await _result(db, attempt, quiz, lecture)
 
 
 async def list_attempts(
@@ -236,7 +289,7 @@ async def get_attempt(db: AsyncSession, user: User, attempt_id: str) -> AttemptR
     aid = _uuid_or_404(attempt_id, ATTEMPT_NOT_FOUND)
     row = (
         await db.execute(
-            select(QuizAttempt, Lecture)
+            select(QuizAttempt, Quiz, Lecture)
             .join(Quiz, Quiz.id == QuizAttempt.quiz_id)
             .join(Lecture, Lecture.id == Quiz.lecture_id)
             .where(
@@ -248,4 +301,4 @@ async def get_attempt(db: AsyncSession, user: User, attempt_id: str) -> AttemptR
     ).first()
     if row is None:
         raise AppError(*ATTEMPT_NOT_FOUND, 404)
-    return await _result(db, row[0], row[1])
+    return await _result(db, row[0], row[1], row[2])

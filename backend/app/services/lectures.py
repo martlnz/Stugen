@@ -4,13 +4,22 @@ import uuid
 from pathlib import PurePath
 
 import pymupdf
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.errors import LECTURE_NOT_FOUND, AppError
-from app.db.models import Lecture, Quiz, SlideDeck, Summary, User, utcnow
-from app.schemas.lecture import LectureAvailable, LectureError, LectureOut, LectureSort
+from app.db.models import (
+    Chapter,
+    Lecture,
+    Lesson,
+    Quiz,
+    SlideDeck,
+    Summary,
+    User,
+    utcnow,
+)
+from app.schemas.lecture import LectureError, LectureOut, LectureSort, LessonCounts
 from app.services.jobs import enqueue_process_lecture
 from app.services.storage import get_storage, lecture_prefix
 
@@ -31,29 +40,28 @@ async def get_owned_lecture(db: AsyncSession, user: User, lecture_id: str) -> Le
     return lecture
 
 
-async def availability(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, LectureAvailable]:
-    result = {i: LectureAvailable() for i in ids}
+async def lesson_counts(db: AsyncSession, ids: list[uuid.UUID]) -> dict[uuid.UUID, LessonCounts]:
+    result = {i: LessonCounts() for i in ids}
     if not ids:
         return result
-    for lid in await db.scalars(select(Summary.lecture_id).where(Summary.lecture_id.in_(ids))):
-        result[lid].summary = True
     rows = await db.execute(
-        select(SlideDeck.lecture_id, SlideDeck.pptx_key).where(SlideDeck.lecture_id.in_(ids))
+        select(Lesson.lecture_id, Lesson.status, func.count())
+        .where(Lesson.lecture_id.in_(ids))
+        .group_by(Lesson.lecture_id, Lesson.status)
     )
-    for lid, pptx_key in rows:
-        result[lid].slides = True
-        result[lid].pptx = pptx_key is not None
-    quiz_ids = await db.scalars(
-        select(Quiz.lecture_id)
-        .where(Quiz.lecture_id.in_(ids), Quiz.status == "completed")
-        .distinct()
-    )
-    for lid in quiz_ids:
-        result[lid].quiz = True
+    for lid, status, count in rows:
+        counts = result[lid]
+        counts.total += count
+        if status == "completed":
+            counts.completed += count
+        elif status in ("queued", "processing"):
+            counts.processing += count
+        elif status == "failed":
+            counts.failed += count
     return result
 
 
-def to_out(lecture: Lecture, available: LectureAvailable) -> LectureOut:
+def to_out(lecture: Lecture, counts: LessonCounts) -> LectureOut:
     error = None
     if lecture.status == "failed" and lecture.error_code:
         error = LectureError(code=lecture.error_code, message=lecture.error_message or "")
@@ -66,7 +74,9 @@ def to_out(lecture: Lecture, available: LectureAvailable) -> LectureOut:
         status=lecture.status,  # type: ignore[arg-type]
         progress_step=lecture.progress_step,  # type: ignore[arg-type]
         error=error,
-        available=available,
+        lessons=counts,
+        # Hoàn tất nhưng không có bài nào = xử lý theo luồng cũ (trước ADR-0017)
+        needs_regenerate=lecture.status == "completed" and counts.total == 0,
         created_at=lecture.created_at,
         updated_at=lecture.updated_at,
         completed_at=lecture.completed_at,
@@ -74,8 +84,8 @@ def to_out(lecture: Lecture, available: LectureAvailable) -> LectureOut:
 
 
 async def lecture_out(db: AsyncSession, lecture: Lecture) -> LectureOut:
-    avail = await availability(db, [lecture.id])
-    return to_out(lecture, avail[lecture.id])
+    counts = await lesson_counts(db, [lecture.id])
+    return to_out(lecture, counts[lecture.id])
 
 
 def _inspect_pdf(data: bytes) -> tuple[int, str | None]:
@@ -159,8 +169,8 @@ async def list_lectures(
     lectures = list(
         await db.scalars(stmt.order_by(order).offset((page - 1) * page_size).limit(page_size))
     )
-    avail = await availability(db, [lec.id for lec in lectures])
-    return [to_out(lec, avail[lec.id]) for lec in lectures], total
+    counts = await lesson_counts(db, [lec.id for lec in lectures])
+    return [to_out(lec, counts[lec.id]) for lec in lectures], total
 
 
 async def rename_lecture(db: AsyncSession, lecture: Lecture, title: str) -> Lecture:
@@ -189,5 +199,28 @@ async def retry_lecture(db: AsyncSession, lecture: Lecture) -> Lecture:
     lecture.error_message = None
     lecture.updated_at = utcnow()
     await db.commit()
+    enqueue_process_lecture(lecture.id)
+    return lecture
+
+
+async def regenerate_lecture(db: AsyncSession, lecture: Lecture) -> Lecture:
+    """Xoá nội dung đã sinh (giữ PDF) rồi tách mục lục lại theo ADR-0017."""
+    if lecture.status in ("queued", "processing"):
+        raise AppError("LECTURE_NOT_READY", "Bài giảng đang được xử lý.", 409)
+    for model in (Quiz, Summary, SlideDeck, Chapter):
+        await db.execute(delete(model).where(model.lecture_id == lecture.id))
+    lecture.status = "queued"
+    lecture.progress_step = None
+    lecture.error_code = None
+    lecture.error_message = None
+    lecture.completed_at = None
+    lecture.updated_at = utcnow()
+    await db.commit()
+    prefix = lecture_prefix(lecture.user_id, lecture.id)
+    for sub in ("lessons/", "slides.pptx"):
+        try:
+            await asyncio.to_thread(get_storage().delete_prefix, prefix + sub)
+        except Exception:
+            logger.exception("Failed to delete generated files %s", prefix + sub)
     enqueue_process_lecture(lecture.id)
     return lecture

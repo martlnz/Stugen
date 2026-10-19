@@ -1,50 +1,50 @@
-"""Quiz: ẩn đáp án, chấm điểm, quyền sở hữu, nội dung bài giảng (summary/slides/pptx)."""
+"""API bài học + quiz (ADR-0017): quyền sở hữu, chọn bài, ẩn đáp án, chấm điểm, tạo lại."""
 
 import uuid
 
 import pytest
 from httpx import AsyncClient
+from sqlalchemy import select
 
 from app.ai.llm.fake import FakeLLMClient
-from app.db.models import Question, User
+from app.db.models import Lecture, Question, User
 from app.db.session import sync_session
+from app.services import lectures as lecture_service
+from app.services import lessons as lesson_service
 from app.services import quizzes as quiz_service
 from app.worker.pipeline import LecturePipeline
 from tests.fakes import MemoryStorage
-from tests.test_pipeline import FIXTURES
+from tests.test_pipeline import lessons_of, make_lecture
 
 
 @pytest.fixture(autouse=True)
-def no_enqueue(monkeypatch: pytest.MonkeyPatch) -> list[object]:
-    calls: list[object] = []
-    monkeypatch.setattr(quiz_service, "enqueue_generate_quiz", calls.append)
+def jobs(monkeypatch: pytest.MonkeyPatch) -> dict[str, list[object]]:
+    calls: dict[str, list[object]] = {"lesson": [], "quiz": [], "lecture": []}
+    monkeypatch.setattr(lesson_service, "enqueue_generate_lesson", calls["lesson"].append)
+    monkeypatch.setattr(quiz_service, "enqueue_generate_quiz", calls["quiz"].append)
+    monkeypatch.setattr(lecture_service, "enqueue_process_lecture", calls["lecture"].append)
     return calls
 
 
 @pytest.fixture
-def processed_lecture(user_a: tuple[User, str], memory_storage: MemoryStorage) -> uuid.UUID:
-    """Bài giảng của alice đã xử lý xong bằng FakeLLMClient."""
-    from app.db.models import Lecture
-
-    user = user_a[0]
+def lecture_id(user_a: tuple[User, str], memory_storage: MemoryStorage) -> uuid.UUID:
+    """Bài giảng của alice đã tách mục lục; bài 1.1 đã tạo học liệu."""
+    lid = make_lecture(memory_storage, user_id=user_a[0].id)
     with sync_session() as db:
-        lecture = Lecture(
-            user_id=user.id,
-            title="Nhập môn CSDL",
-            original_filename="sample.pdf",
-            pdf_key=f"users/{user.id}/lectures/l/source.pdf",
-            file_size=1,
-            page_count=6,
-        )
-        db.add(lecture)
-        db.commit()
-        memory_storage.put(lecture.pdf_key, (FIXTURES / "sample.pdf").read_bytes(), "x")
-        LecturePipeline(db, FakeLLMClient(), memory_storage).run(lecture.id)
-        return lecture.id
+        pipeline = LecturePipeline(db, FakeLLMClient(), memory_storage)
+        pipeline.run(lid)
+        pipeline.run_lesson(lessons_of(lid)[0].id)
+    return lid
 
 
-async def default_quiz(client: AsyncClient, lecture_id: uuid.UUID) -> dict:
-    res = await client.get(f"/api/lectures/{lecture_id}/quizzes")
+async def outline(client: AsyncClient, lid: uuid.UUID) -> list[dict]:
+    res = await client.get(f"/api/lectures/{lid}/outline")
+    assert res.status_code == 200, res.text
+    return [lesson for ch in res.json()["chapters"] for lesson in ch["lessons"]]
+
+
+async def lesson_quiz(client: AsyncClient, lesson_id: str) -> dict:
+    res = await client.get(f"/api/lessons/{lesson_id}/quizzes")
     assert res.status_code == 200
     items = res.json()["items"]
     assert len(items) == 1
@@ -53,129 +53,176 @@ async def default_quiz(client: AsyncClient, lecture_id: uuid.UUID) -> dict:
 
 def answer_key(quiz_id: str) -> dict[str, int]:
     with sync_session() as db:
-        from sqlalchemy import select
-
         rows = db.scalars(select(Question).where(Question.quiz_id == uuid.UUID(quiz_id)))
         return {str(q.id): q.answer_index for q in rows}
 
 
-async def test_lecture_content_available(
-    client_a: AsyncClient, processed_lecture: uuid.UUID
+async def test_lecture_reports_lesson_counts(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    body = (await client_a.get(f"/api/lectures/{lecture_id}")).json()
+    assert body["status"] == "completed"
+    assert body["lessons"] == {"total": 6, "completed": 1, "processing": 0, "failed": 0}
+    assert body["needs_regenerate"] is False
+
+
+async def test_outline(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    res = await client_a.get(f"/api/lectures/{lecture_id}/outline")
+    chapters = res.json()["chapters"]
+    assert [c["title"] for c in chapters][0] == "Chương 1. Tổng quan về cơ sở dữ liệu"
+    first = chapters[0]["lessons"][0]
+    assert first["number"] == "1.1"
+    assert first["status"] == "completed"
+    assert first["available"] == {"summary": True, "slides": True, "pptx": True, "quiz": True}
+    assert first["sections"] and {"title", "page_start", "page_end"} <= set(first["sections"][0])
+    second = chapters[0]["lessons"][1]
+    assert second["status"] == "pending" and second["sections"] == []
+
+
+async def test_generate_selected_lessons(
+    client_a: AsyncClient, lecture_id: uuid.UUID, jobs: dict[str, list[object]]
 ) -> None:
-    lid = processed_lecture
-    lecture = (await client_a.get(f"/api/lectures/{lid}")).json()
-    assert lecture["status"] == "completed"
-    assert lecture["available"] == {"summary": True, "slides": True, "pptx": True, "quiz": True}
+    lessons = await outline(client_a, lecture_id)
+    ids = [lessons[0]["id"], lessons[1]["id"], lessons[2]["id"]]
+    res = await client_a.post(
+        f"/api/lectures/{lecture_id}/lessons/generate", json={"lesson_ids": ids}
+    )
+    assert res.status_code == 202
+    statuses = {ls["id"]: ls["status"] for ch in res.json()["chapters"] for ls in ch["lessons"]}
+    # Bài đã xong bỏ qua; chỉ 2 bài mới được xếp hàng
+    assert statuses[ids[0]] == "completed"
+    assert statuses[ids[1]] == statuses[ids[2]] == "queued"
+    assert [str(x) for x in jobs["lesson"]] == ids[1:]
+    # Gửi lại không xếp hàng trùng
+    await client_a.post(f"/api/lectures/{lecture_id}/lessons/generate", json={"lesson_ids": ids})
+    assert len(jobs["lesson"]) == 2
 
-    summary = (await client_a.get(f"/api/lectures/{lid}/summary")).json()
-    assert len(summary["chapters"]) == 3
-    assert summary["content_md"].startswith("# Nhập môn CSDL")
 
-    slides = (await client_a.get(f"/api/lectures/{lid}/slides")).json()
+async def test_generate_rejects_foreign_lesson(
+    client_a: AsyncClient, lecture_id: uuid.UUID
+) -> None:
+    res = await client_a.post(
+        f"/api/lectures/{lecture_id}/lessons/generate",
+        json={"lesson_ids": [str(uuid.uuid4())]},
+    )
+    assert res.status_code == 422
+    res = await client_a.post(
+        f"/api/lectures/{lecture_id}/lessons/generate", json={"lesson_ids": []}
+    )
+    assert res.status_code == 422
+
+
+async def test_lesson_content(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    lessons = await outline(client_a, lecture_id)
+    lid = lessons[0]["id"]
+    summary = (await client_a.get(f"/api/lessons/{lid}/summary")).json()
+    assert summary["number"] == "1.1"
+    assert summary["sections"]
+    assert "giao-trinh-csdl-final" not in summary["content_md"]
+    slides = (await client_a.get(f"/api/lessons/{lid}/slides")).json()
     assert slides["pptx_available"] is True
     assert slides["deck"]["slides"][0]["layout"] == "title"
-
-    res = await client_a.get(f"/api/lectures/{lid}/slides.pptx")
-    assert res.status_code == 200
-    assert res.content[:2] == b"PK"
-    assert "filename*=UTF-8''Nh%E1%BA%ADp" in res.headers["content-disposition"]
-
-
-async def test_summary_not_ready_is_409(client_a: AsyncClient, user_a: tuple[User, str]) -> None:
-    from app.db.models import Lecture
-
-    with sync_session() as db:
-        lecture = Lecture(
-            user_id=user_a[0].id,
-            title="x",
-            original_filename="x.pdf",
-            pdf_key="k",
-            file_size=1,
-            page_count=1,
-        )
-        db.add(lecture)
-        db.commit()
-        lid = lecture.id
+    res = await client_a.get(f"/api/lessons/{lid}/slides.pptx")
+    assert res.status_code == 200 and res.content[:2] == b"PK"
+    assert "filename*=UTF-8''1.1" in res.headers["content-disposition"]
+    # Bài chưa tạo → 409
+    pending = lessons[1]["id"]
     for path in ("summary", "slides", "slides.pptx"):
-        res = await client_a.get(f"/api/lectures/{lid}/{path}")
+        res = await client_a.get(f"/api/lessons/{pending}/{path}")
         assert res.status_code == 409
-        assert res.json()["code"] == "LECTURE_NOT_READY"
-    res = await client_a.post(f"/api/lectures/{lid}/quizzes", json={"num_questions": 10})
-    assert res.status_code == 409
+        assert res.json()["code"] == "LESSON_NOT_READY"
 
 
-async def test_get_quiz_hides_answers(client_a: AsyncClient, processed_lecture: uuid.UUID) -> None:
-    quiz = await default_quiz(client_a, processed_lecture)
+async def test_other_users_lesson_and_lecture_are_404(
+    client_a: AsyncClient, client_b: AsyncClient, lecture_id: uuid.UUID
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    lid = lessons[0]["id"]
+    for method, path in [
+        ("GET", f"/api/lessons/{lid}/summary"),
+        ("GET", f"/api/lessons/{lid}/slides"),
+        ("GET", f"/api/lessons/{lid}/slides.pptx"),
+        ("GET", f"/api/lessons/{lid}/quizzes"),
+        ("POST", f"/api/lessons/{lid}/quizzes"),
+    ]:
+        res = await client_b.request(method, path)
+        assert res.status_code == 404, (method, path)
+        assert res.json()["code"] == "LESSON_NOT_FOUND"
+    for method, path, body in [
+        ("GET", f"/api/lectures/{lecture_id}/outline", None),
+        ("POST", f"/api/lectures/{lecture_id}/lessons/generate", {"lesson_ids": [lid]}),
+        ("POST", f"/api/lectures/{lecture_id}/regenerate", None),
+        ("GET", f"/api/lectures/{lecture_id}/quizzes", None),
+        ("POST", f"/api/lectures/{lecture_id}/quizzes", {"lesson_ids": [lid]}),
+    ]:
+        res = await client_b.request(method, path, json=body)
+        assert res.status_code == 404, (method, path)
+        assert res.json()["code"] == "LECTURE_NOT_FOUND"
+    assert (await client_b.get("/api/lessons/not-a-uuid/summary")).status_code == 404
+
+
+async def test_get_quiz_hides_answers(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
+    assert quiz["lesson_id"] == lessons[0]["id"] and quiz["is_default"]
     res = await client_a.get(f"/api/quizzes/{quiz['id']}")
     assert res.status_code == 200
-    raw = res.text
-    assert "answer_index" not in raw
-    assert "explanation" not in raw
+    assert "answer_index" not in res.text
+    assert "explanation" not in res.text
     body = res.json()
-    assert len(body["questions"]) == 10
+    assert body["scope_title"] == "Bài 1.1: 1.1 Khái niệm cơ sở dữ liệu"
+    assert len(body["questions"]) == 5
     assert set(body["questions"][0]) == {"id", "position", "question", "options", "page_ref"}
 
 
 async def test_grading_counts_blank_and_missing_as_wrong(
-    client_a: AsyncClient, processed_lecture: uuid.UUID
+    client_a: AsyncClient, lecture_id: uuid.UUID
 ) -> None:
-    quiz = await default_quiz(client_a, processed_lecture)
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
     key = answer_key(quiz["id"])
     ids = list(key)
     answers: dict[str, int | None] = {ids[0]: key[ids[0]], ids[1]: key[ids[1]]}
     answers[ids[2]] = (key[ids[2]] + 1) % 4  # sai
-    answers[ids[3]] = None  # bỏ trống; các câu còn lại không gửi
+    answers[ids[3]] = None  # bỏ trống; câu 5 không gửi
     res = await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": answers})
     assert res.status_code == 201, res.text
     result = res.json()
     assert result["score"] == 2
-    assert result["total"] == 10
+    assert result["total"] == 5
     by_id = {r["question_id"]: r for r in result["results"]}
     assert by_id[ids[0]]["is_correct"] is True
     assert by_id[ids[2]]["is_correct"] is False
-    assert by_id[ids[3]]["selected_index"] is None
-    assert by_id[ids[3]]["is_correct"] is False
-    assert by_id[ids[5]]["selected_index"] is None
-    assert by_id[ids[0]]["explanation"]
-    assert sum(c["total"] for c in result["by_chapter"]) == 10
-    assert sum(c["correct"] for c in result["by_chapter"]) == 2
+    assert by_id[ids[3]]["selected_index"] is None and by_id[ids[3]]["is_correct"] is False
+    assert by_id[ids[4]]["selected_index"] is None
+    assert result["by_chapter"] == [
+        {"chapter_idx": 0, "title": "1.1 1.1 Khái niệm cơ sở dữ liệu", "correct": 2, "total": 5}
+    ]
+    assert result["lesson_id"] == lessons[0]["id"]
 
-    # Lịch sử và xem lại
     history = (await client_a.get(f"/api/quizzes/{quiz['id']}/attempts")).json()
     assert history["total"] == 1
     again = (await client_a.get(f"/api/attempts/{result['id']}")).json()
     assert again["score"] == 2
-    summary = await default_quiz(client_a, processed_lecture)
-    assert summary["attempt_count"] == 1
-    assert summary["best_score"] == 2
+    summary = await lesson_quiz(client_a, lessons[0]["id"])
+    assert summary["attempt_count"] == 1 and summary["best_score"] == 2
 
 
-async def test_all_correct(client_a: AsyncClient, processed_lecture: uuid.UUID) -> None:
-    quiz = await default_quiz(client_a, processed_lecture)
-    key = answer_key(quiz["id"])
-    res = await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": key})
-    assert res.json()["score"] == 10
-
-
-async def test_foreign_question_id_is_422(
-    client_a: AsyncClient, processed_lecture: uuid.UUID
-) -> None:
-    quiz = await default_quiz(client_a, processed_lecture)
+async def test_foreign_question_id_is_422(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
     res = await client_a.post(
         f"/api/quizzes/{quiz['id']}/attempts", json={"answers": {str(uuid.uuid4()): 1}}
     )
     assert res.status_code == 422
-    assert res.json()["code"] == "VALIDATION_ERROR"
-    key = answer_key(quiz["id"])
-    qid = next(iter(key))
+    qid = next(iter(answer_key(quiz["id"])))
     res = await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": {qid: 7}})
     assert res.status_code == 422
 
 
 async def test_quiz_and_attempt_of_other_user_is_404(
-    client_a: AsyncClient, client_b: AsyncClient, processed_lecture: uuid.UUID
+    client_a: AsyncClient, client_b: AsyncClient, lecture_id: uuid.UUID
 ) -> None:
-    quiz = await default_quiz(client_a, processed_lecture)
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
     attempt = (
         await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": {}})
     ).json()
@@ -194,37 +241,101 @@ async def test_quiz_and_attempt_of_other_user_is_404(
     assert res.json()["code"] == "ATTEMPT_NOT_FOUND"
 
 
-async def test_create_and_delete_quiz(
-    client_a: AsyncClient, processed_lecture: uuid.UUID, no_enqueue: list[object]
+async def test_extra_lesson_quiz(
+    client_a: AsyncClient,
+    lecture_id: uuid.UUID,
+    jobs: dict[str, list[object]],
+    memory_storage: MemoryStorage,
 ) -> None:
+    lessons = await outline(client_a, lecture_id)
     res = await client_a.post(
-        f"/api/lectures/{processed_lecture}/quizzes", json={"num_questions": 20}
+        f"/api/lessons/{lessons[0]['id']}/quizzes", json={"num_questions": 10}
     )
     assert res.status_code == 202
     quiz = res.json()
-    assert quiz["status"] == "queued"
-    assert len(no_enqueue) == 1
-    res = await client_a.get(f"/api/quizzes/{quiz['id']}")
-    assert res.status_code == 409
-    assert res.json()["code"] == "QUIZ_NOT_READY"
-    res = await client_a.post(
-        f"/api/lectures/{processed_lecture}/quizzes", json={"num_questions": 15}
-    )
+    assert quiz["status"] == "queued" and len(jobs["quiz"]) == 1
+    assert (await client_a.get(f"/api/quizzes/{quiz['id']}")).json()["code"] == "QUIZ_NOT_READY"
+    res = await client_a.post(f"/api/lessons/{lessons[0]['id']}/quizzes", json={"num_questions": 3})
     assert res.status_code == 422
-    assert (await client_a.delete(f"/api/quizzes/{quiz['id']}")).status_code == 204
-    assert (await client_a.get(f"/api/quizzes/{quiz['id']}")).status_code == 404
+    res = await client_a.post(f"/api/lessons/{lessons[1]['id']}/quizzes", json={})
+    assert res.status_code == 409
 
-
-async def test_generate_quiz_task_avoids_existing_questions(
-    client_a: AsyncClient, processed_lecture: uuid.UUID, memory_storage: MemoryStorage
-) -> None:
-    res = await client_a.post(
-        f"/api/lectures/{processed_lecture}/quizzes", json={"num_questions": 20}
-    )
-    qid = uuid.UUID(res.json()["id"])
     llm = FakeLLMClient()
     with sync_session() as db:
-        LecturePipeline(db, llm, memory_storage).run_quiz(qid)
+        LecturePipeline(db, llm, memory_storage).run_quiz(uuid.UUID(quiz["id"]))
     assert all("Không lặp lại các câu hỏi đã có" in user for _, user in llm.calls)
-    detail = (await client_a.get(f"/api/quizzes/{qid}")).json()
-    assert len(detail["questions"]) == 20
+    detail = (await client_a.get(f"/api/quizzes/{quiz['id']}")).json()
+    assert len(detail["questions"]) == 10
+    assert (await client_a.delete(f"/api/quizzes/{quiz['id']}")).status_code == 204
+
+
+async def test_scope_quiz_over_selected_lessons(
+    client_a: AsyncClient, lecture_id: uuid.UUID, memory_storage: MemoryStorage
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    with sync_session() as db:
+        LecturePipeline(db, FakeLLMClient(), memory_storage).run_lesson(uuid.UUID(lessons[1]["id"]))
+    ids = [lessons[0]["id"], lessons[1]["id"]]
+    res = await client_a.post(
+        f"/api/lectures/{lecture_id}/quizzes", json={"num_questions": 10, "lesson_ids": ids}
+    )
+    assert res.status_code == 202, res.text
+    quiz = res.json()
+    assert quiz["lesson_id"] is None and quiz["lesson_ids"] == ids
+    with sync_session() as db:
+        LecturePipeline(db, FakeLLMClient(), memory_storage).run_quiz(uuid.UUID(quiz["id"]))
+    detail = (await client_a.get(f"/api/quizzes/{quiz['id']}")).json()
+    assert detail["scope_title"] == "Quiz tổng hợp 2 bài"
+    assert len(detail["questions"]) == 10
+    result = (
+        await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": {}})
+    ).json()
+    assert [c["total"] for c in result["by_chapter"]] == [5, 5]
+    # Bài chưa tạo học liệu không chọn được
+    res = await client_a.post(
+        f"/api/lectures/{lecture_id}/quizzes",
+        json={"num_questions": 10, "lesson_ids": [lessons[2]["id"]]},
+    )
+    assert res.status_code == 409
+
+
+async def test_regenerate_resets_outline(
+    client_a: AsyncClient,
+    lecture_id: uuid.UUID,
+    jobs: dict[str, list[object]],
+    memory_storage: MemoryStorage,
+) -> None:
+    assert any("/lessons/" in k for k in memory_storage.objects)
+    res = await client_a.post(f"/api/lectures/{lecture_id}/regenerate")
+    assert res.status_code == 202
+    assert res.json()["status"] == "queued"
+    assert jobs["lecture"] == [lecture_id]
+    assert (await client_a.get(f"/api/lectures/{lecture_id}/outline")).json()["chapters"] == []
+    assert not any("/lessons/" in k for k in memory_storage.objects)
+    assert any(k.endswith("source.pdf") for k in memory_storage.objects)
+    # Đang chờ xử lý → không tạo lại được
+    assert (await client_a.post(f"/api/lectures/{lecture_id}/regenerate")).status_code == 409
+
+
+async def test_old_format_lecture_needs_regenerate(
+    client_a: AsyncClient, user_a: tuple[User, str]
+) -> None:
+    with sync_session() as db:
+        lecture = Lecture(
+            user_id=user_a[0].id,
+            title="cũ",
+            original_filename="x.pdf",
+            pdf_key="k",
+            file_size=1,
+            page_count=1,
+            status="completed",
+        )
+        db.add(lecture)
+        db.commit()
+        lid = lecture.id
+    body = (await client_a.get(f"/api/lectures/{lid}")).json()
+    assert body["needs_regenerate"] is True
+    res = await client_a.post(
+        f"/api/lectures/{lid}/lessons/generate", json={"lesson_ids": [str(uuid.uuid4())]}
+    )
+    assert res.status_code == 422

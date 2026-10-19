@@ -1,0 +1,16 @@
+Dưới đây là vài dòng đầu của từng trang trong một chương giáo trình (trang {{ page_start }}–{{ page_end }}).
+Tên chương hiện tại: {{ chapter_title }}
+
+Hãy chia chương thành các bài học nhỏ để sinh viên học lần lượt.
+
+Yêu cầu:
+- lessons: {{ min_lessons }}–{{ max_lessons }} bài, theo đúng thứ tự trong giáo trình; mỗi bài dài khoảng 2–6 trang và trọn một chủ đề.
+- title: tên bài nêu đúng nội dung kiến thức chính (dưới 60 ký tự), không dùng tên chung chung như "Phần 1", "Giới thiệu", "Nội dung".
+- start_page: trang bắt đầu bài, theo đánh dấu [[trang N]], trong khoảng {{ page_start }}–{{ page_end }}; bài đầu tiên bắt đầu ở trang {{ page_start }}.
+- chapter_title: tên chương ngắn gọn (dưới 60 ký tự) phản ánh nội dung chính của cả chương.
+{% if content_language == "vi" %}- Viết bằng tiếng Việt.{% endif %}
+
+Nội dung:
+"""
+{{ snippets }}
+"""

@@ -13,11 +13,13 @@ class LectureError(BaseModel):
     message: str
 
 
-class LectureAvailable(BaseModel):
-    summary: bool = False
-    slides: bool = False
-    pptx: bool = False
-    quiz: bool = False
+class LessonCounts(BaseModel):
+    """Số bài theo trạng thái tạo học liệu (ADR-0017)."""
+
+    total: int = 0
+    completed: int = 0
+    processing: int = 0
+    failed: int = 0
 
 
 class LectureOut(BaseModel):
@@ -29,7 +31,10 @@ class LectureOut(BaseModel):
     status: LectureStatus
     progress_step: ProgressStep | None
     error: LectureError | None
-    available: LectureAvailable
+    lessons: LessonCounts
+    needs_regenerate: bool = Field(
+        description="Bài giảng định dạng cũ (trước ADR-0017): cần tạo lại nội dung"
+    )
     created_at: datetime
     updated_at: datetime
     completed_at: datetime | None

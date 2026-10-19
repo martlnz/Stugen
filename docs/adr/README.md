@@ -13,15 +13,16 @@ Tài liệu ghi lại các quyết định kiến trúc của dự án **Stugen*
 | [0005](0005-xac-thuc-google-oauth.md) | Xác thực Google do backend quản lý, phiên bằng cookie | Chấp nhận |
 | [0006](0006-co-so-du-lieu-postgresql.md) | PostgreSQL + SQLAlchemy 2.0 + Alembic | Chấp nhận |
 | [0007](0007-luu-tru-file-minio.md) | Lưu trữ file bằng MinIO (S3-compatible) | Chấp nhận · Sửa đổi một phần bởi 0016 |
-| [0008](0008-xu-ly-bat-dong-bo-celery.md) | Xử lý bất đồng bộ bằng Celery + Redis | Chấp nhận · Sửa đổi một phần bởi 0015 |
+| [0008](0008-xu-ly-bat-dong-bo-celery.md) | Xử lý bất đồng bộ bằng Celery + Redis | Chấp nhận · Sửa đổi một phần bởi 0015, 0017 |
 | [0009](0009-trich-xuat-pdf-pymupdf.md) | Trích xuất và chia chương PDF bằng PyMuPDF | Chấp nhận |
-| [0010](0010-chien-luoc-goi-llm.md) | Chiến lược gọi LLM: theo chương, đầu ra có cấu trúc | Chấp nhận · Sửa đổi một phần bởi 0015, 0016 |
-| [0011](0011-dinh-dang-slide.md) | Slide lưu dạng JSON trung gian, render Reveal.js, xuất PPTX | Chấp nhận · Sửa đổi một phần bởi 0015 |
-| [0012](0012-thiet-ke-quiz.md) | Quiz chấm điểm phía server, không lộ đáp án | Chấp nhận |
+| [0010](0010-chien-luoc-goi-llm.md) | Chiến lược gọi LLM: theo chương, đầu ra có cấu trúc | Chấp nhận · Sửa đổi một phần bởi 0015, 0016, 0017 |
+| [0011](0011-dinh-dang-slide.md) | Slide lưu dạng JSON trung gian, render Reveal.js, xuất PPTX | Chấp nhận · Sửa đổi một phần bởi 0015, 0017 |
+| [0012](0012-thiet-ke-quiz.md) | Quiz chấm điểm phía server, không lộ đáp án | Chấp nhận · Sửa đổi một phần bởi 0017 |
 | [0013](0013-cap-nhat-trang-thai-polling.md) | Cập nhật trạng thái xử lý bằng polling | Chấp nhận |
 | [0014](0014-trien-khai-docker-compose.md) | Triển khai bằng Docker Compose + reverse proxy | Chấp nhận |
-| [0015](0015-lam-ro-pipeline-llm.md) | Làm rõ pipeline LLM: thử lại, slide, schema chương, ngôn ngữ, lưu theo chương | Chấp nhận |
+| [0015](0015-lam-ro-pipeline-llm.md) | Làm rõ pipeline LLM: thử lại, slide, schema chương, ngôn ngữ, lưu theo chương | Chấp nhận · Sửa đổi một phần bởi 0017 |
 | [0016](0016-cong-cu-ten-tai-nguyen-deepseek-giay-phep.md) | Chạy lệnh bằng `just`, tên tài nguyên `stugen`, DeepSeek làm LLM mặc định, giấy phép AGPL-3.0 | Chấp nhận |
+| [0017](0017-bai-nho-chon-pham-vi-slide-tu-van-ban-goc.md) | Chia giáo trình thành bài nhỏ, chọn bài để tạo học liệu, slide sinh từ văn bản gốc | Chấp nhận |
 
 ## Nguồn chuẩn
 
@@ -43,6 +44,8 @@ ADR-0005 thay thế cách xác thực ban đầu của PRD v2.0 (Auth.js gửi `
 ADR-0015 làm rõ chính sách thử lại LLM và cách sinh slide; PRD được cập nhật lên v2.2 cho khớp.
 
 ADR-0016 chọn DeepSeek làm LLM mặc định; PRD v2.3 thêm lưu ý nội dung được gửi tới dịch vụ AI bên thứ ba.
+
+ADR-0017 đổi luồng: tách giáo trình thành bài nhỏ, người dùng chọn bài rồi mới tạo học liệu; PRD v2.4 cập nhật mục 3.
 
 ## Quy trình
 

@@ -50,6 +50,7 @@ def _default(schema_name: str, user: str) -> dict[str, Any]:
             }
         case "LessonSummaryLLM":
             return {
+                "title": f"Kiến thức về {title}",
                 "overview": f"Bài {title} trình bày các khái niệm nền tảng.",
                 "sections": [
                     {

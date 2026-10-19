@@ -157,7 +157,8 @@ def test_generate_lesson(memory_storage: MemoryStorage) -> None:
     assert deck is not None
     layouts = [s["layout"] for s in deck["slides"]]
     assert layouts[:2] == ["title", "agenda"] and layouts[-1] == "summary"
-    assert deck["title"] == "1.1 Khái niệm cơ sở dữ liệu"
+    # Tên bài từ bookmark đủ rõ nên được giữ nguyên
+    assert deck["title"] == done.title == "1.1 Khái niệm cơ sở dữ liệu"
     assert all("tr." in b for b in deck["slides"][1]["bullets"])
     content = [s for s in deck["slides"] if s["layout"] == "bullets"]
     assert content and all(s.get("example") and s.get("explanation") for s in content)
@@ -262,6 +263,17 @@ def test_long_slide_fields_are_clipped_not_rejected() -> None:
     assert first.example and len(first.example) <= 400
     assert len(out.takeaways) == 6
     assert clip("ngắn", 120) == "ngắn"
+
+
+def test_vague_lesson_titles_are_replaced() -> None:
+    from app.ai.generators.lesson import better_title
+
+    suggested = "Mục đích nghiên cứu của trí tuệ nhân tạo"
+    assert better_title("Mục đích", suggested) == suggested
+    assert better_title("Phát triển; Phân loại máy tính", suggested) == suggested
+    assert better_title("Ngôn ngữ SQL (phần 2)", suggested) == suggested
+    assert better_title("Đặc điểm chung của ngôn ngữ lập trình", suggested).startswith("Đặc")
+    assert better_title("Mục đích", None) == "Mục đích"
 
 
 def test_section_pages_are_clamped() -> None:

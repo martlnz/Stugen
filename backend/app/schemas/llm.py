@@ -102,9 +102,17 @@ class LessonSection(BaseModel):
 class LessonSummaryLLM(BaseModel):
     """Đầu ra LLM khi tóm tắt một bài; lưu ở lessons.summary sau khi code kẹp số trang."""
 
+    title: str | None = Field(
+        default=None, description="Tên bài cụ thể, nêu đúng nội dung chính của bài"
+    )
     overview: str = Field(min_length=1, description="2–4 câu khái quát nội dung bài")
     sections: list[LessonSection] = Field(min_length=1)
     terms: list[Term] = Field(default_factory=list)
+
+    @field_validator("title", mode="before")
+    @classmethod
+    def _fit_title(cls, v: Any) -> Any:
+        return _clip_opt(v, MAX_SLIDE_TITLE)
 
     @field_validator("sections", mode="before")
     @classmethod

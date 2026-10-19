@@ -2,6 +2,7 @@
 
 import logging
 import math
+import re
 from typing import Protocol
 
 from app.ai.llm import LLMClient, LLMError
@@ -88,6 +89,17 @@ def summarize_lesson(llm: LLMClient, lesson: LessonLike) -> LessonSummaryLLM:
     result = llm.generate_json(system_prompt(), user, LessonSummaryLLM, purpose="lesson_summary")
     sections = _clamp_sections(result.sections, lesson.page_start, lesson.page_end)
     return result.model_copy(update={"sections": sections})
+
+
+VAGUE_TITLE_RE = re.compile(r";|\(phần \d+\)$")
+
+
+def better_title(current: str, suggested: str | None) -> str:
+    """Tên từ tiêu đề phụ thường mơ hồ ("Mục đích", "A; B; C") → dùng tên LLM đề xuất."""
+    bare = re.sub(r"^\d+(\.\d+)*\.?\s*", "", current)
+    if suggested and (len(bare) < 20 or VAGUE_TITLE_RE.search(current)):
+        return suggested
+    return current
 
 
 def summary_markdown(summary: LessonSummaryLLM) -> str:

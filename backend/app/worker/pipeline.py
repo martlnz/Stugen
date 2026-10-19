@@ -181,6 +181,7 @@ class LecturePipeline:
         if lesson.summary is not None:
             return LessonSummaryLLM.model_validate(lesson.summary)
         summary = lesson_gen.summarize_lesson(self.llm, lesson)
+        lesson.title = lesson_gen.better_title(lesson.title, summary.title)
         lesson.summary = summary.model_dump()
         self._commit()
         return summary

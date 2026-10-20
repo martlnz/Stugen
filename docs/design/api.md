@@ -1,6 +1,6 @@
 # Tài liệu API
 
-> Phiên bản 2.0 · Dựa trên [PRD v2.4](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013, 0017 và [data-model.md](data-model.md) · Cập nhật 19/10/2026 (khớp code v0.2.0)
+> Phiên bản 2.1 · Dựa trên [PRD v2.5](../product/PRD.md), [ADR](../adr/README.md) 0004, 0005, 0007, 0012, 0013, 0017, 0018 và [data-model.md](data-model.md) · Cập nhật 20/10/2026
 
 ## 1. Quy ước chung
 
@@ -68,6 +68,7 @@ Lỗi validate (422) có thêm `errors`:
 | 409 | `LESSON_NOT_READY` | Bài học chưa được tạo học liệu |
 | 409 | `LECTURE_NOT_FAILED` | Thử lại bài giảng không ở trạng thái `failed` |
 | 409 | `QUIZ_NOT_READY` | Quiz chưa `completed` |
+| 409 | `QUIZ_NOT_EDITABLE` | Quiz định dạng cũ (theo chương) không sửa được |
 | 413 | `FILE_TOO_LARGE` | File > 20 MB |
 | 422 | `VALIDATION_ERROR` | Dữ liệu không hợp lệ |
 | 429 | `RATE_LIMITED` | Vượt giới hạn tần suất |
@@ -113,6 +114,8 @@ Khi vượt giới hạn, response có header `Retry-After` (giây).
 | GET | `/lectures/{id}/quizzes` | Mọi quiz của bài giảng |
 | POST | `/lectures/{id}/quizzes` | Sinh quiz tổng hợp trên các bài đã chọn |
 | GET | `/quizzes/{id}` | Câu hỏi của quiz (không có đáp án) |
+| GET | `/quizzes/{id}/edit` | Câu hỏi kèm đáp án để sửa (ADR-0018) |
+| PUT | `/quizzes/{id}/questions` | Lưu toàn bộ câu hỏi đã sửa |
 | DELETE | `/quizzes/{id}` | Xoá quiz |
 | POST | `/quizzes/{id}/attempts` | Nộp bài, chấm điểm |
 | GET | `/quizzes/{id}/attempts` | Lịch sử làm bài |
@@ -398,13 +401,14 @@ Không chứa tên file hay tên giáo trình. **409** `LESSON_NOT_READY`, **404
   "attempt_count": 2,
   "best_score": 8,
   "last_attempt_at": "2026-10-18T10:05:00Z",
+  "edited_at": null,
   "created_at": "2026-10-18T09:34:10Z"
 }
 ```
 
 `lesson_id`: quiz của một bài (`null` với quiz tổng hợp hoặc quiz cũ). `lesson_ids`: phạm vi quiz tổng hợp. Quiz mặc định của bài có `num_questions` = clamp(round(số trang × 1,5), 5, 15).
 
-`error`: `null` hoặc `{ "code": "QUIZ_FAILED", "message": "<thông điệp tiếng Việt>" }` khi `status = failed`. `attempt_count`, `best_score`, `last_attempt_at` chỉ tính các lần làm của người dùng hiện tại.
+`error`: `null` hoặc `{ "code": "QUIZ_FAILED", "message": "<thông điệp tiếng Việt>" }` khi `status = failed`. `attempt_count`, `best_score`, `last_attempt_at` chỉ tính các lần làm của người dùng hiện tại. `edited_at`: thời điểm lưu chỉnh sửa gần nhất (`null` nếu chưa sửa).
 
 ### `GET /lectures/{id}/quizzes` · `GET /lessons/{id}/quizzes`
 Danh sách quiz của bài giảng (mọi loại) hoặc của một bài, mới nhất trước (không phân trang).
@@ -458,7 +462,86 @@ Lấy câu hỏi để làm bài. **Không** chứa `answer_index` và `explanat
   ]
 }
 ```
-**409** `QUIZ_NOT_READY` nếu quiz chưa `completed`.
+`page_ref` có thể `null` (câu nhập tay không ghi trang, ADR-0018). **409** `QUIZ_NOT_READY` nếu quiz chưa `completed`.
+
+### `GET /quizzes/{id}/edit`
+Câu hỏi **kèm đáp án** để chủ quiz sửa (ADR-0018). Chỉ chủ sở hữu; không thuộc người dùng → **404**.
+
+**200** – `QuizEditable`
+```json
+{
+  "id": "a41f9e22-...",
+  "lecture_id": "5d2c8a40-...",
+  "lecture_title": "Nhập môn Cơ sở dữ liệu",
+  "lesson_id": "b43092d1-...",
+  "scope_title": "Bài 2.3: Hình thức hóa thuật toán và các phương pháp biểu diễn",
+  "num_questions": 10,
+  "attempt_count": 2,
+  "edited_at": null,
+  "lessons": [
+    { "id": "b43092d1-...", "number": "2.3", "title": "Hình thức hóa thuật toán", "page_start": 30, "page_end": 38 }
+  ],
+  "questions": [
+    {
+      "id": "7b1e0c55-...",
+      "position": 1,
+      "question": "Thuộc tính nào dùng để định danh duy nhất mỗi bộ trong một quan hệ?",
+      "options": ["Khoá ngoại", "Khoá chính", "Chỉ mục", "Ràng buộc CHECK"],
+      "answer_index": 1,
+      "explanation": "Khoá chính xác định duy nhất mỗi bộ.",
+      "page_ref": 34,
+      "lesson_id": "b43092d1-...",
+      "source": "ai"
+    }
+  ]
+}
+```
+`lessons`: các bài trong phạm vi quiz (một bài với quiz của bài). `source`: `ai` · `edited` · `manual`. `attempt_count`: số lần làm bài sẽ bị xoá khi lưu. **409** `QUIZ_NOT_READY` · `QUIZ_NOT_EDITABLE`.
+
+### `PUT /quizzes/{id}/questions`
+Thay **toàn bộ** danh sách câu hỏi (một transaction). Thứ tự trong mảng là thứ tự hiển thị.
+
+**Request**
+```json
+{
+  "questions": [
+    {
+      "id": "7b1e0c55-...",
+      "question": "Thuộc tính nào định danh duy nhất mỗi bộ?",
+      "options": ["Khoá ngoại", "Khoá chính", "Chỉ mục", "Ràng buộc CHECK"],
+      "answer_index": 1,
+      "explanation": "Khoá chính không trùng và không NULL.",
+      "page_ref": 34,
+      "lesson_id": null
+    },
+    {
+      "id": null,
+      "question": "Câu hỏi nhập tay",
+      "options": ["A", "B", "C", "D"],
+      "answer_index": 0,
+      "explanation": "",
+      "page_ref": null,
+      "lesson_id": null
+    }
+  ]
+}
+```
+| Trường | Ràng buộc |
+|---|---|
+| `questions` | 1–30 câu |
+| `id` | `null` = câu mới; nếu có phải thuộc quiz này, không lặp lại. Câu vắng mặt bị xoá |
+| `question` | 1–1000 ký tự |
+| `options` | Đúng 4 chuỗi, mỗi chuỗi 1–300 ký tự, không trùng nhau |
+| `answer_index` | 0–3 |
+| `explanation` | 0–2000 ký tự |
+| `lesson_id` | Quiz tổng hợp: bắt buộc, thuộc phạm vi quiz. Quiz của một bài: bỏ qua |
+| `page_ref` | Không bắt buộc; nếu có phải nằm trong khoảng trang của bài |
+
+Lựa chọn giữ đúng thứ tự người dùng nhập (không xáo trộn). Câu sửa nội dung có `source = edited`, câu mới `manual`.
+
+**200** – `QuizEditable` sau khi lưu. Lưu thành công **xoá mọi lần làm bài** của quiz, cập nhật `num_questions` và `edited_at`.
+
+**422** `VALIDATION_ERROR` với `errors[].field` dạng `questions.<i>.<trường>`. **409** `QUIZ_NOT_READY` · `QUIZ_NOT_EDITABLE`.
 
 ### `DELETE /quizzes/{id}`
 Xoá quiz cùng câu hỏi và lịch sử làm bài. **204**.

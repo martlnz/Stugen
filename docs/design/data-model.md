@@ -1,10 +1,10 @@
 # Mô hình dữ liệu
 
-> Phiên bản 1.3 · Dựa trên [PRD v2.4](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016, 0017 · Cập nhật 19/10/2026
+> Phiên bản 1.4 · Dựa trên [PRD v2.5](../product/PRD.md) và [ADR](../adr/README.md) 0005, 0006, 0007, 0010, 0011, 0012, 0015, 0016, 0017, 0018 · Cập nhật 20/10/2026
 >
 > Đây là **nguồn chuẩn** cho lược đồ CSDL; lược đồ trong ADR-0006 chỉ là bản phác thảo.
 >
-> Migration `*_initial_schema.py` tạo mục 9 (trừ `llm_calls`); migration `*_lessons_and_lesson_quizzes.py` thêm bảng `lessons` và cột quiz theo bài (ADR-0017). Tên ràng buộc theo quy ước `pk_/uq_/ck_/fk_<bảng>_...`.
+> Migration `*_initial_schema.py` tạo mục 9 (trừ `llm_calls`); migration `*_lessons_and_lesson_quizzes.py` thêm bảng `lessons` và cột quiz theo bài (ADR-0017); migration `*_quiz_editing.py` thêm `quizzes.edited_at`, `questions.source`, bỏ NOT NULL `questions.page_ref` (ADR-0018). Tên ràng buộc theo quy ước `pk_/uq_/ck_/fk_<bảng>_...`.
 
 ## 1. Tổng quan
 
@@ -289,6 +289,7 @@ Một lần sinh bộ câu hỏi. Mỗi **bài** có 1 quiz mặc định và c�
 | `num_questions` | INT | NOT NULL, 1–30 | Quiz mặc định của bài: clamp(round(số trang × 1,5), 5, 15) |
 | `is_default` | BOOLEAN | NOT NULL, DEFAULT false | Quiz sinh tự động khi tạo học liệu cho bài |
 | `error_message` | TEXT | NULL | |
+| `edited_at` | TIMESTAMPTZ | NULL | Lần lưu chỉnh sửa gần nhất (ADR-0018) |
 | `created_at` | TIMESTAMPTZ | NOT NULL | |
 
 Index: `(lecture_id, created_at DESC)`.
@@ -303,9 +304,10 @@ Index: `(lecture_id, created_at DESC)`.
 | `question` | TEXT | NOT NULL | |
 | `options` | JSONB | NOT NULL | Mảng đúng 4 chuỗi, đã xáo trộn |
 | `answer_index` | SMALLINT | NOT NULL, 0–3 | **Không bao giờ trả về trước khi nộp bài** |
-| `explanation` | TEXT | NOT NULL | |
-| `page_ref` | INT | NOT NULL | Trang tham chiếu trong PDF |
+| `explanation` | TEXT | NOT NULL | Có thể rỗng với câu nhập tay |
+| `page_ref` | INT | NULL | Trang tham chiếu trong PDF; NULL với câu nhập tay không ghi trang |
 | `chapter_idx` | INT | NOT NULL | Đơn vị nguồn: `lessons.idx` với quiz theo bài (ADR-0017); `chapters.idx` với quiz cũ |
+| `source` | TEXT | NOT NULL, DEFAULT `ai`, CHECK | `ai` · `edited` (người dùng sửa) · `manual` (người dùng thêm) |
 
 Unique: `(quiz_id, position)`.
 
@@ -480,6 +482,7 @@ Xoá bài giảng → xoá bản ghi DB → xoá prefix `users/{user_id}/lecture
 | Xoá bài giảng | chapters → lessons, summaries, slide_decks, quizzes → questions, quiz_attempts; file trên MinIO. `llm_calls.lecture_id` đặt NULL |
 | Tạo lại nội dung | chapters → lessons, summaries, slide_decks, quizzes; PPTX trên MinIO |
 | Xoá quiz | questions, quiz_attempts |
+| Lưu chỉnh sửa quiz (ADR-0018) | questions bị bỏ khỏi danh sách; **mọi** quiz_attempts của quiz |
 | Đăng xuất | Bản ghi `sessions` tương ứng |
 | Tác vụ dọn dẹp hằng ngày | `sessions` hết hạn; object MinIO không còn `lecture` tương ứng |
 
@@ -593,6 +596,7 @@ CREATE TABLE quizzes (
   num_questions INT NOT NULL CHECK (num_questions BETWEEN 1 AND 30),
   is_default    BOOLEAN NOT NULL DEFAULT false,
   error_message TEXT,
+  edited_at     TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX ix_quizzes_lecture_created ON quizzes(lecture_id, created_at DESC);
@@ -605,8 +609,9 @@ CREATE TABLE questions (
   options      JSONB NOT NULL CHECK (jsonb_array_length(options) = 4),
   answer_index SMALLINT NOT NULL CHECK (answer_index BETWEEN 0 AND 3),
   explanation  TEXT NOT NULL,
-  page_ref     INT NOT NULL,
+  page_ref     INT,
   chapter_idx  INT NOT NULL,
+  source       TEXT NOT NULL DEFAULT 'ai' CHECK (source IN ('ai','edited','manual')),
   UNIQUE (quiz_id, position)
 );
 

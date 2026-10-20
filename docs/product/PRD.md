@@ -1,6 +1,6 @@
 # PRD – Stugen: Website tạo học liệu từ giáo trình PDF
 
-> Dự án phi thương mại · Phiên bản 2.4 · 19/10/2026
+> Dự án phi thương mại · Phiên bản 2.5 · 20/10/2026
 >
 > Tài liệu liên quan: [Mô hình dữ liệu](../design/data-model.md) · [Tài liệu API](../design/api.md) · [ADR](../adr/README.md)
 
@@ -25,7 +25,7 @@ Mọi bài giảng đã tạo được lưu theo tài khoản để xem lại sa
 **Không có (có thể bổ sung sau):**
 - Đăng nhập bằng phương thức khác.
 - PDF dạng ảnh scan (OCR), file Word/PowerPoint.
-- Chia sẻ, lớp học, chỉnh sửa nội dung đã sinh.
+- Chia sẻ, lớp học, chỉnh sửa tóm tắt và slide đã sinh.
 
 ## 3. Chức năng
 
@@ -60,6 +60,7 @@ Mọi bài giảng đã tạo được lưu theo tài khoản để xem lại sa
 - Câu hỏi trắc nghiệm 4 lựa chọn; mỗi câu có đáp án đúng, giải thích ngắn và số trang tham chiếu.
 - Làm bài, nộp bài, xem điểm theo từng bài và danh sách câu sai kèm giải thích.
 - Lưu lịch sử điểm các lần làm.
+- **Sửa quiz** (ADR-0018): sửa câu hỏi, lựa chọn, đáp án đúng, giải thích, trang tham chiếu; xoá, đổi thứ tự, thêm câu nhập tay (trang không bắt buộc); bấm Lưu một lần. Lưu chỉnh sửa xoá lịch sử làm bài của quiz đó (có cảnh báo).
 
 ### 3.6 Thư viện bài giảng
 - Danh sách bài giảng của tài khoản: tên, ngày tạo, số trang, trạng thái, số bài đã tạo học liệu.
@@ -131,7 +132,7 @@ REST API dưới tiền tố `/api`, xác thực bằng cookie phiên. Nhóm end
 | Xác thực | `/auth/google/login`, `/auth/google/callback`, `/auth/logout`, `/me` |
 | Bài giảng | `/lectures`, `/lectures/{id}`, `/lectures/{id}/retry`, `/lectures/{id}/pdf` |
 | Nội dung | `/lectures/{id}/summary`, `/lectures/{id}/slides`, `/lectures/{id}/slides.pptx` |
-| Quiz | `/lectures/{id}/quizzes`, `/quizzes/{id}`, `/quizzes/{id}/attempts`, `/attempts/{id}` |
+| Quiz | `/lectures/{id}/quizzes`, `/quizzes/{id}`, `/quizzes/{id}/edit`, `/quizzes/{id}/questions`, `/quizzes/{id}/attempts`, `/attempts/{id}` |
 
 Chi tiết request/response và mã lỗi: [api.md](../design/api.md).
 
@@ -142,7 +143,8 @@ Chi tiết request/response và mã lỗi: [api.md](../design/api.md).
 3. **Tải lên** – vùng kéo-thả PDF, trạng thái xử lý.
 4. **Bài giảng** – mục lục chương → bài (chọn bài để tạo học liệu); bài đang chọn có các tab Tóm tắt / Slide / Quiz / PDF gốc; tab Quiz tổng hợp.
 5. **Làm quiz** – từng câu hỏi, nút nộp bài.
-6. **Kết quả** – điểm, câu sai kèm giải thích.
+6. **Sửa quiz** – danh sách câu hỏi dạng form, thêm câu, nút Lưu.
+7. **Kết quả** – điểm, câu sai kèm giải thích.
 
 ## 9. Kế hoạch thực hiện
 

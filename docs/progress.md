@@ -1,13 +1,13 @@
 # Tiến độ dự án Stugen
 
 > **Đọc file này đầu tiên khi mở phiên mới.** Cập nhật ngay sau mỗi việc hoàn thành (mục 2, 3, 6) và trước khi kết thúc phiên.
-> Cập nhật lần cuối: 19/10/2026 (v0.2.0) · Commit gần nhất: xem `git log --oneline -5`
+> Cập nhật lần cuối: 20/10/2026 (v0.2.0 + sửa quiz) · Commit gần nhất: xem `git log --oneline -5`
 
 ## 1. Trạng thái hiện tại
 
 | Hạng mục | Trạng thái |
 |---|---|
-| Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ PRD 2.4, ADR 0001–0017, data-model 1.3, api.md 2.0 |
+| Tài liệu thiết kế (PRD, ADR, data model, API) | ✅ PRD 2.5, ADR 0001–0018, data-model 1.4, api.md 2.1 |
 | Chuẩn bị môi trường (`.env`, Google OAuth, LLM key, PDF mẫu, image Docker) | ✅ Xong (kiểm tra lại 19/10) |
 | Code | ✅ v0.2.0 – giáo trình tách thành bài nhỏ, chọn bài để tạo học liệu (ADR-0017); hạn chế: [known-issues.md](known-issues.md) |
 | Đăng nhập Google thật | ⏳ Chờ chủ dự án bấm thử một lần (mục 3) |
@@ -67,10 +67,18 @@
 - **Frontend:** trang bài giảng 2 cột (mục lục chương → bài → mục nhỏ kèm trang, checkbox, nút tạo; bài đang chọn với tab Tóm tắt/Slide/Quiz/PDF + Quiz tổng hợp), slide có khung "Ví dụ minh hoạ", banner tạo lại, thư viện hiển thị số bài đã tạo.
 - **Chạy thật:** `toc-50p.pdf` → 30 bài trong ~4 giây; mỗi bài 3–4 trang ~40 giây (DeepSeek); Playwright headless desktop + mobile không lỗi console.
 
+### 20/10/2026 · Phiên 5 – Sửa quiz sau khi AI sinh (ADR-0018)
+- **Chốt với chủ dự án:** lưu chỉnh sửa → xoá lịch sử làm bài của quiz (có cảnh báo); `page_ref` không bắt buộc; ghi bằng ADR-0018, PRD 2.5.
+- **Backend:** migration `quiz_editing` (`quizzes.edited_at`, `questions.source` `ai/edited/manual`, `page_ref` NULL); `GET /quizzes/{id}/edit` (kèm đáp án, chỉ chủ sở hữu), `PUT /quizzes/{id}/questions` thay toàn bộ danh sách (thứ tự = `position`, vị trí tạm âm tránh trùng UNIQUE, không xáo lựa chọn, quiz tổng hợp bắt buộc `lesson_id`, trang trong khoảng bài); 409 `QUIZ_NOT_EDITABLE` với quiz cũ; lỗi `value_error`/`too_short`/`too_long` có thông điệp tiếng Việt. 56 test (thêm 5).
+- **Frontend:** trang `/quizzes/{id}/edit` (sửa câu, 4 lựa chọn + radio đáp án đúng, giải thích, trang, chọn bài với quiz tổng hợp, lên/xuống/xoá, thêm câu, kiểm tra phía client, lỗi 422 theo câu, hộp thoại xoá lịch sử, cảnh báo rời trang); nút "Sửa" và badge "Đã chỉnh sửa" ở tab Quiz; trang kết quả ẩn link trang khi `page_ref` null. `ApiError` có `errors`. Thêm `ui/textarea`.
+- **Chạy thật:** Playwright headless (desktop + mobile) trên quiz bài và quiz tổng hợp: sửa, xoá, thêm, đổi thứ tự, lưu → đúng thứ tự/`source`, lịch sử về 0, chấm theo đáp án mới; không lỗi console.
+- **Lưu ý:** container `web` chạy bản build production → sửa frontend phải `docker compose up -d --build web` mới thấy.
+
 ## 3. Việc tiếp theo
 
 **Chủ dự án**
 - [ ] Mở <http://localhost>, bấm "Đăng nhập với Google" bằng Gmail trong *Test users* → về `/library`, F5 vẫn đăng nhập, đăng xuất được. Báo lại nếu lỗi (xem `just logs`).
+- [ ] Thử sửa quiz: tab Quiz → "Sửa"; góp ý nếu muốn giữ lịch sử làm bài thay vì xoá (ADR-0018 phương án 2).
 - [ ] Thử luồng v0.2 với một giáo trình thật: tải lên → chọn vài bài → xem tóm tắt/slide/quiz; góp ý cách tách bài (bài quá dài/ngắn, tên bài).
 
 **Sau v0.1.0** (theo "Để sau" trong [kế hoạch](plans/plan-1-ngay.md) và [known-issues.md](known-issues.md))

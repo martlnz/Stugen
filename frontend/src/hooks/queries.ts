@@ -12,6 +12,8 @@ export type LessonSummary = Schema<"LessonSummaryOut">;
 export type LessonSlides = Schema<"LessonSlidesOut">;
 export type QuizSummary = Schema<"QuizSummary">;
 export type QuizDetail = Schema<"QuizDetail">;
+export type QuizEditable = Schema<"QuizEditable">;
+export type QuestionInput = Schema<"QuestionInput">;
 export type AttemptResult = Schema<"AttemptResult">;
 export type AttemptPage = Schema<"AttemptPage">;
 
@@ -24,6 +26,7 @@ export const keys = {
   lessonSlides: (id: string) => ["lesson", id, "slides"] as const,
   lessonQuizzes: (id: string) => ["lesson", id, "quizzes"] as const,
   quiz: (id: string) => ["quiz", id] as const,
+  quizEdit: (id: string) => ["quiz", id, "edit"] as const,
   attempts: (quizId: string) => ["quiz", quizId, "attempts"] as const,
   attempt: (id: string) => ["attempt", id] as const,
 };
@@ -114,6 +117,15 @@ export function useQuiz(id: string) {
     queryKey: keys.quiz(id),
     queryFn: () => api<QuizDetail>(`/quizzes/${id}`),
     staleTime: Infinity,
+  });
+}
+
+/** Câu hỏi kèm đáp án cho chế độ sửa (ADR-0018); không cache lâu để luôn sửa trên bản mới. */
+export function useQuizEdit(id: string) {
+  return useQuery({
+    queryKey: keys.quizEdit(id),
+    queryFn: () => api<QuizEditable>(`/quizzes/${id}/edit`),
+    refetchOnWindowFocus: false,
   });
 }
 

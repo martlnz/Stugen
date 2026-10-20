@@ -65,16 +65,24 @@ function ResultItem({
         })}
       </ul>
       {skipped && <p className="text-sm text-muted-foreground">Bạn bỏ trống câu này.</p>}
-      <div className="rounded-md bg-muted/60 p-3 text-sm">
-        <span className="font-medium">Giải thích: </span>
-        <InlineMath>{result.explanation}</InlineMath>{" "}
-        <Link
-          href={`/lectures/${lectureId}?${lessonId ? `lesson=${lessonId}&` : ""}tab=pdf&page=${result.page_ref}`}
-          className="whitespace-nowrap text-primary hover:underline"
-        >
-          (trang {result.page_ref})
-        </Link>
-      </div>
+      {(result.explanation || result.page_ref !== null) && (
+        <div className="rounded-md bg-muted/60 p-3 text-sm">
+          {result.explanation && (
+            <>
+              <span className="font-medium">Giải thích: </span>
+              <InlineMath>{result.explanation}</InlineMath>{" "}
+            </>
+          )}
+          {result.page_ref !== null && (
+            <Link
+              href={`/lectures/${lectureId}?${lessonId ? `lesson=${lessonId}&` : ""}tab=pdf&page=${result.page_ref}`}
+              className="whitespace-nowrap text-primary hover:underline"
+            >
+              (trang {result.page_ref})
+            </Link>
+          )}
+        </div>
+      )}
     </li>
   );
 }

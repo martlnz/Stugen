@@ -6,14 +6,19 @@ export type Schema<K extends keyof components["schemas"]> = components["schemas"
 const API_BASE = "/api";
 const UNSAFE = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+export type FieldError = { field: string; message: string };
+
 export class ApiError extends Error {
   readonly status: number;
   readonly code: string;
+  /** Lỗi theo trường của `422 VALIDATION_ERROR` (api.md mục 1.6). */
+  readonly errors: FieldError[];
 
-  constructor(status: number, code: string, detail: string) {
+  constructor(status: number, code: string, detail: string, errors: FieldError[] = []) {
     super(detail);
     this.status = status;
     this.code = code;
+    this.errors = errors;
   }
 }
 
@@ -50,17 +55,19 @@ export async function api<T>(path: string, options: RequestOptions = {}): Promis
   if (!res.ok) {
     let code = "INTERNAL";
     let detail = "Đã xảy ra lỗi, vui lòng thử lại.";
+    let errors: FieldError[] = [];
     try {
-      const data = (await res.json()) as { code?: string; detail?: string };
+      const data = (await res.json()) as { code?: string; detail?: string; errors?: FieldError[] };
       code = data.code ?? code;
       detail = data.detail ?? detail;
+      errors = data.errors ?? errors;
     } catch {
       if (res.status === 413) {
         code = "FILE_TOO_LARGE";
         detail = "File vượt quá 20 MB.";
       }
     }
-    throw new ApiError(res.status, code, detail);
+    throw new ApiError(res.status, code, detail, errors);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;

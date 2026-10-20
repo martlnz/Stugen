@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { History, ListChecks, Loader2, Play, Plus, Trash2 } from "lucide-react";
+import { History, ListChecks, Loader2, Pencil, Play, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -75,6 +75,7 @@ function QuizCard({
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="font-medium">{label}</h3>
             {quiz.is_default && <Badge variant="secondary">Mặc định</Badge>}
+            {quiz.edited_at && <Badge variant="outline">Đã chỉnh sửa</Badge>}
             {isActive(quiz.status) && (
               <Badge variant="outline">
                 <Loader2 className="animate-spin" /> Đang tạo
@@ -97,6 +98,12 @@ function QuizCard({
               <Button variant="ghost" size="sm" onClick={() => setShowHistory((v) => !v)}>
                 <History /> Lịch sử
               </Button>
+              <Link
+                href={`/quizzes/${quiz.id}/edit`}
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <Pencil /> Sửa
+              </Link>
               <Link href={`/quizzes/${quiz.id}`} className={buttonVariants({ size: "sm" })}>
                 <Play /> Làm bài
               </Link>

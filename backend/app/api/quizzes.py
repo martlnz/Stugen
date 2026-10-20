@@ -7,7 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user
 from app.db.models import Lecture, Quiz, User
 from app.db.session import get_db
-from app.schemas.content import AttemptCreate, AttemptPage, AttemptResult, QuizDetail
+from app.schemas.content import (
+    AttemptCreate,
+    AttemptPage,
+    AttemptResult,
+    QuizDetail,
+    QuizEditable,
+    QuizQuestionsUpdate,
+)
 from app.services import quizzes as service
 
 router = APIRouter(tags=["quizzes"])
@@ -26,6 +33,25 @@ async def get_quiz(
     owned: tuple[Quiz, Lecture] = Depends(owned_quiz), db: AsyncSession = Depends(get_db)
 ) -> QuizDetail:
     return await service.quiz_detail(db, *owned)
+
+
+@router.get("/quizzes/{quiz_id}/edit", response_model=QuizEditable)
+async def get_quiz_for_edit(
+    owned: tuple[Quiz, Lecture] = Depends(owned_quiz),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> QuizEditable:
+    return await service.quiz_for_edit(db, user, *owned)
+
+
+@router.put("/quizzes/{quiz_id}/questions", response_model=QuizEditable)
+async def update_questions(
+    body: QuizQuestionsUpdate,
+    owned: tuple[Quiz, Lecture] = Depends(owned_quiz),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> QuizEditable:
+    return await service.update_questions(db, user, owned[0], owned[1], body)
 
 
 @router.delete("/quizzes/{quiz_id}", status_code=204)

@@ -32,6 +32,11 @@ LECTURE_NOT_FOUND = ("LECTURE_NOT_FOUND", "Không tìm thấy bài giảng.")
 QUIZ_NOT_FOUND = ("QUIZ_NOT_FOUND", "Không tìm thấy quiz.")
 ATTEMPT_NOT_FOUND = ("ATTEMPT_NOT_FOUND", "Không tìm thấy lần làm bài.")
 LESSON_NOT_FOUND = ("LESSON_NOT_FOUND", "Không tìm thấy bài học.")
+QUIZ_NOT_READY = ("QUIZ_NOT_READY", "Quiz chưa được tạo xong.")
+QUIZ_NOT_EDITABLE = (
+    "QUIZ_NOT_EDITABLE",
+    "Quiz định dạng cũ không sửa được. Hãy tạo lại nội dung bài giảng.",
+)
 
 _HTTP_CODES = {
     401: ("UNAUTHENTICATED", "Bạn cần đăng nhập."),
@@ -63,6 +68,12 @@ def _vi_message(err: dict[str, Any]) -> str:
             )
         case "literal_error" | "enum":
             return f"Giá trị phải là một trong: {ctx.get('expected')}."
+        case "too_short":
+            return f"Tối thiểu {ctx.get('min_length')} phần tử."
+        case "too_long":
+            return f"Tối đa {ctx.get('max_length')} phần tử."
+        case "value_error":
+            return str(ctx.get("error") or "Giá trị không hợp lệ.")
         case "int_parsing" | "int_type":
             return "Phải là số nguyên."
         case "greater_than_equal" | "less_than_equal" | "greater_than" | "less_than":

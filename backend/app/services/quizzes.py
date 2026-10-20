@@ -1,17 +1,28 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import ATTEMPT_NOT_FOUND, QUIZ_NOT_FOUND, AppError
-from app.db.models import Chapter, Lecture, Lesson, Question, Quiz, QuizAttempt, User
+from app.core.errors import (
+    ATTEMPT_NOT_FOUND,
+    QUIZ_NOT_EDITABLE,
+    QUIZ_NOT_FOUND,
+    QUIZ_NOT_READY,
+    AppError,
+)
+from app.db.models import Chapter, Lecture, Lesson, Question, Quiz, QuizAttempt, User, utcnow
 from app.schemas.content import (
     AttemptListItem,
     AttemptResult,
     ChapterScore,
+    EditLesson,
+    QuestionEditable,
+    QuestionInput,
     QuestionPublic,
     QuestionResult,
     QuizDetail,
+    QuizEditable,
+    QuizQuestionsUpdate,
     QuizSummary,
 )
 from app.schemas.lecture import LectureError
@@ -84,6 +95,7 @@ async def _summaries(db: AsyncSession, quizzes: list[Quiz], user: User) -> list[
                 attempt_count=count,
                 best_score=best,
                 last_attempt_at=last,  # type: ignore[arg-type]
+                edited_at=q.edited_at,
                 created_at=q.created_at,
             )
         )
@@ -147,15 +159,22 @@ async def create_scope_quiz(
     return await _queue(db, user, quiz)
 
 
+async def _scope_lessons(db: AsyncSession, quiz: Quiz) -> list[Lesson]:
+    """Các bài trong phạm vi quiz, theo thứ tự mục lục; rỗng với quiz định dạng cũ."""
+    ids = [quiz.lesson_id] if quiz.lesson_id else [uuid.UUID(i) for i in quiz.lesson_ids or []]
+    if not ids:
+        return []
+    return list(await db.scalars(select(Lesson).where(Lesson.id.in_(ids)).order_by(Lesson.idx)))
+
+
 async def _scope(db: AsyncSession, quiz: Quiz) -> tuple[str, dict[int, str]]:
     """(tên phạm vi, idx → tên bài/chương) để hiển thị và chấm điểm theo bài."""
     if quiz.lesson_id or quiz.lesson_ids:
-        ids = [quiz.lesson_id] if quiz.lesson_id else [uuid.UUID(i) for i in quiz.lesson_ids or []]
-        lessons = list(await db.scalars(select(Lesson).where(Lesson.id.in_(ids))))
+        lessons = await _scope_lessons(db, quiz)
         names = {ls.idx: f"{ls.number} {ls.title}" for ls in lessons}
         if quiz.lesson_id and lessons:
             return f"Bài {lessons[0].number}: {lessons[0].title}", names
-        return f"Quiz tổng hợp {len(ids)} bài", names
+        return f"Quiz tổng hợp {len(quiz.lesson_ids or [])} bài", names
     # Quiz định dạng cũ: chapter_idx là chỉ số chương
     chapters = await db.scalars(select(Chapter).where(Chapter.lecture_id == quiz.lecture_id))
     return "Toàn bài giảng", {c.idx: c.title for c in chapters}
@@ -163,7 +182,7 @@ async def _scope(db: AsyncSession, quiz: Quiz) -> tuple[str, dict[int, str]]:
 
 async def quiz_detail(db: AsyncSession, quiz: Quiz, lecture: Lecture) -> QuizDetail:
     if quiz.status != "completed":
-        raise AppError("QUIZ_NOT_READY", "Quiz chưa được tạo xong.", 409)
+        raise AppError(*QUIZ_NOT_READY, 409)
     questions = await db.scalars(
         select(Question).where(Question.quiz_id == quiz.id).order_by(Question.position)
     )
@@ -186,6 +205,145 @@ async def quiz_detail(db: AsyncSession, quiz: Quiz, lecture: Lecture) -> QuizDet
             for q in questions
         ],
     )
+
+
+async def _editable_lessons(db: AsyncSession, quiz: Quiz) -> list[Lesson]:
+    if quiz.status != "completed":
+        raise AppError(*QUIZ_NOT_READY, 409)
+    lessons = await _scope_lessons(db, quiz)
+    if not lessons:
+        raise AppError(*QUIZ_NOT_EDITABLE, 409)
+    return lessons
+
+
+async def quiz_for_edit(db: AsyncSession, user: User, quiz: Quiz, lecture: Lecture) -> QuizEditable:
+    """Câu hỏi kèm đáp án cho chủ quiz sửa (ADR-0018)."""
+    lessons = await _editable_lessons(db, quiz)
+    by_idx = {ls.idx: ls.id for ls in lessons}
+    questions = await db.scalars(
+        select(Question).where(Question.quiz_id == quiz.id).order_by(Question.position)
+    )
+    attempts = await db.scalar(
+        select(func.count()).where(QuizAttempt.quiz_id == quiz.id, QuizAttempt.user_id == user.id)
+    )
+    scope_title, _ = await _scope(db, quiz)
+    return QuizEditable(
+        id=quiz.id,
+        lecture_id=lecture.id,
+        lecture_title=lecture.title,
+        lesson_id=quiz.lesson_id,
+        scope_title=scope_title,
+        num_questions=quiz.num_questions,
+        attempt_count=attempts or 0,
+        edited_at=quiz.edited_at,
+        lessons=[
+            EditLesson(
+                id=ls.id,
+                number=ls.number,
+                title=ls.title,
+                page_start=ls.page_start,
+                page_end=ls.page_end,
+            )
+            for ls in lessons
+        ],
+        questions=[
+            QuestionEditable(
+                id=q.id,
+                position=q.position,
+                question=q.question,
+                options=q.options,
+                answer_index=q.answer_index,
+                explanation=q.explanation,
+                page_ref=q.page_ref,
+                lesson_id=by_idx.get(q.chapter_idx),
+                source=q.source,  # type: ignore[arg-type]
+            )
+            for q in questions
+        ],
+    )
+
+
+def _changed(q: Question, item: QuestionInput, lesson: Lesson) -> bool:
+    return (
+        q.question != item.question
+        or q.options != item.options
+        or q.answer_index != item.answer_index
+        or q.explanation != item.explanation
+        or q.page_ref != item.page_ref
+        or q.chapter_idx != lesson.idx
+    )
+
+
+async def update_questions(
+    db: AsyncSession, user: User, quiz: Quiz, lecture: Lecture, body: QuizQuestionsUpdate
+) -> QuizEditable:
+    """Thay toàn bộ câu hỏi; xoá lịch sử làm bài của quiz (ADR-0018)."""
+    lessons = await _editable_lessons(db, quiz)
+    lesson_by_id = {ls.id: ls for ls in lessons}
+    existing = {
+        q.id: q for q in await db.scalars(select(Question).where(Question.quiz_id == quiz.id))
+    }
+
+    seen: list[uuid.UUID] = []
+    targets: list[Lesson] = []
+    for i, item in enumerate(body.questions):
+        if item.id is not None:
+            if item.id not in existing or item.id in seen:
+                raise _validation(f"questions.{i}.id", "Câu hỏi không thuộc quiz này.")
+            seen.append(item.id)
+        if quiz.lesson_id:
+            lesson = lessons[0]
+        elif item.lesson_id is None or item.lesson_id not in lesson_by_id:
+            raise _validation(f"questions.{i}.lesson_id", "Chọn một bài trong phạm vi quiz.")
+        else:
+            lesson = lesson_by_id[item.lesson_id]
+        if item.page_ref is not None and not lesson.page_start <= item.page_ref <= lesson.page_end:
+            raise _validation(
+                f"questions.{i}.page_ref",
+                f"Trang phải nằm trong khoảng {lesson.page_start}–{lesson.page_end}.",
+            )
+        targets.append(lesson)
+
+    for qid, q in existing.items():
+        if qid not in seen:
+            await db.delete(q)
+    # Vị trí tạm âm để không đụng UNIQUE (quiz_id, position) khi đổi thứ tự
+    for n, qid in enumerate(seen, start=1):
+        existing[qid].position = -n
+    await db.flush()
+
+    for position, (item, lesson) in enumerate(zip(body.questions, targets, strict=True), 1):
+        if item.id is None:
+            db.add(
+                Question(
+                    quiz_id=quiz.id,
+                    position=position,
+                    question=item.question,
+                    options=item.options,
+                    answer_index=item.answer_index,
+                    explanation=item.explanation,
+                    page_ref=item.page_ref,
+                    chapter_idx=lesson.idx,
+                    source="manual",
+                )
+            )
+            continue
+        q = existing[item.id]
+        if q.source == "ai" and _changed(q, item, lesson):
+            q.source = "edited"
+        q.position = position
+        q.question = item.question
+        q.options = item.options
+        q.answer_index = item.answer_index
+        q.explanation = item.explanation
+        q.page_ref = item.page_ref
+        q.chapter_idx = lesson.idx
+
+    quiz.num_questions = len(body.questions)
+    quiz.edited_at = utcnow()
+    await db.execute(delete(QuizAttempt).where(QuizAttempt.quiz_id == quiz.id))
+    await db.commit()
+    return await quiz_for_edit(db, user, quiz, lecture)
 
 
 async def delete_quiz(db: AsyncSession, quiz: Quiz) -> None:
@@ -252,7 +410,7 @@ async def submit_attempt(
 ) -> AttemptResult:
     """Chấm điểm phía server; câu bỏ trống hoặc không gửi tính sai (ADR-0012)."""
     if quiz.status != "completed":
-        raise AppError("QUIZ_NOT_READY", "Quiz chưa được tạo xong.", 409)
+        raise AppError(*QUIZ_NOT_READY, 409)
     questions = list(await db.scalars(select(Question).where(Question.quiz_id == quiz.id)))
     by_id = {q.id: q for q in questions}
     for qid, value in answers.items():

@@ -1,4 +1,4 @@
-"""API bài học + quiz (ADR-0017): quyền sở hữu, chọn bài, ẩn đáp án, chấm điểm, tạo lại."""
+"""API bài học + quiz (ADR-0017, 0018): sở hữu, chọn bài, ẩn đáp án, chấm điểm, sửa quiz."""
 
 import uuid
 
@@ -7,7 +7,7 @@ from httpx import AsyncClient
 from sqlalchemy import select
 
 from app.ai.llm.fake import FakeLLMClient
-from app.db.models import Lecture, Question, User
+from app.db.models import Lecture, Question, Quiz, User
 from app.db.session import sync_session
 from app.services import lectures as lecture_service
 from app.services import lessons as lesson_service
@@ -339,3 +339,192 @@ async def test_old_format_lecture_needs_regenerate(
         f"/api/lectures/{lid}/lessons/generate", json={"lesson_ids": [str(uuid.uuid4())]}
     )
     assert res.status_code == 422
+
+
+# ---------- Sửa quiz (ADR-0018) ----------
+
+
+def as_input(q: dict) -> dict:
+    keys = ("id", "question", "options", "answer_index", "explanation", "page_ref", "lesson_id")
+    return {k: q[k] for k in keys}
+
+
+def manual(text: str, **extra: object) -> dict:
+    return {
+        "question": text,
+        "options": ["Một", "Hai", "Ba", "Bốn"],
+        "answer_index": 2,
+        "explanation": "",
+        **extra,
+    }
+
+
+async def test_edit_quiz_replaces_questions_and_clears_history(
+    client_a: AsyncClient, lecture_id: uuid.UUID
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
+    qid = quiz["id"]
+    await client_a.post(f"/api/quizzes/{qid}/attempts", json={"answers": {}})
+
+    res = await client_a.get(f"/api/quizzes/{qid}/edit")
+    assert res.status_code == 200, res.text
+    editable = res.json()
+    assert editable["attempt_count"] == 1 and editable["edited_at"] is None
+    assert [ls["id"] for ls in editable["lessons"]] == [lessons[0]["id"]]
+    questions = editable["questions"]
+    assert len(questions) == 5
+    assert all(q["source"] == "ai" and q["lesson_id"] == lessons[0]["id"] for q in questions)
+    assert "answer_index" in questions[0] and "explanation" in questions[0]
+
+    first, second, third = (as_input(q) for q in questions[:3])
+    first = {
+        **first,
+        "question": "  Câu đã sửa?  ",
+        "answer_index": (first["answer_index"] + 1) % 4,
+    }
+    body = {"questions": [third, manual("Câu nhập tay?"), first, second]}  # bỏ câu 4, 5
+    res = await client_a.put(f"/api/quizzes/{qid}/questions", json=body)
+    assert res.status_code == 200, res.text
+    saved = res.json()
+    assert saved["num_questions"] == 4 and saved["edited_at"] is not None
+    assert saved["attempt_count"] == 0
+    assert [q["position"] for q in saved["questions"]] == [1, 2, 3, 4]
+    assert [q["source"] for q in saved["questions"]] == ["ai", "manual", "edited", "ai"]
+    assert saved["questions"][2]["question"] == "Câu đã sửa?"
+    assert saved["questions"][1]["page_ref"] is None
+    assert saved["questions"][1]["options"] == ["Một", "Hai", "Ba", "Bốn"]  # không xáo trộn
+
+    # Lịch sử làm bài đã bị xoá; danh sách quiz có edited_at
+    assert (await client_a.get(f"/api/quizzes/{qid}/attempts")).json()["total"] == 0
+    summary = await lesson_quiz(client_a, lessons[0]["id"])
+    assert summary["num_questions"] == 4 and summary["edited_at"] is not None
+
+    # Trang làm bài vẫn không lộ đáp án
+    res = await client_a.get(f"/api/quizzes/{qid}")
+    assert "answer_index" not in res.text and "explanation" not in res.text
+    assert res.json()["questions"][1]["page_ref"] is None
+
+    # Chấm theo đáp án mới, câu nhập tay tính vào điểm theo bài
+    key = answer_key(qid)
+    result = (await client_a.post(f"/api/quizzes/{qid}/attempts", json={"answers": key})).json()
+    assert result["score"] == 4 and result["total"] == 4
+    assert result["by_chapter"][0]["total"] == 4
+
+
+async def test_edit_quiz_validation(client_a: AsyncClient, lecture_id: uuid.UUID) -> None:
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
+    qid = quiz["id"]
+    editable = (await client_a.get(f"/api/quizzes/{qid}/edit")).json()
+    first = as_input(editable["questions"][0])
+    page_end = editable["lessons"][0]["page_end"]
+
+    async def put(questions: list[dict]) -> dict:
+        res = await client_a.put(f"/api/quizzes/{qid}/questions", json={"questions": questions})
+        assert res.status_code == 422, res.text
+        return res.json()
+
+    body = await put([{**first, "id": str(uuid.uuid4())}])
+    assert body["errors"][0]["field"] == "questions.0.id"
+    body = await put([first, first])
+    assert body["errors"][0]["field"] == "questions.1.id"
+    body = await put([manual("Trùng?", options=["A", "a", "B", "C"])])
+    assert body["errors"][0] == {
+        "field": "questions.0.options",
+        "message": "Các lựa chọn không được trùng nhau.",
+    }
+    body = await put([manual("Trang?", page_ref=page_end + 1)])
+    assert body["errors"][0]["field"] == "questions.0.page_ref"
+    await put([manual("   ")])
+    await put([])
+    await put([manual(f"Câu {i}?") for i in range(31)])
+    # Không lưu gì khi lỗi
+    assert len(answer_key(qid)) == 5
+
+
+async def test_edit_quiz_of_other_user_is_404(
+    client_a: AsyncClient, client_b: AsyncClient, lecture_id: uuid.UUID
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    quiz = await lesson_quiz(client_a, lessons[0]["id"])
+    res = await client_b.get(f"/api/quizzes/{quiz['id']}/edit")
+    assert res.status_code == 404 and res.json()["code"] == "QUIZ_NOT_FOUND"
+    res = await client_b.put(
+        f"/api/quizzes/{quiz['id']}/questions", json={"questions": [manual("Câu?")]}
+    )
+    assert res.status_code == 404 and res.json()["code"] == "QUIZ_NOT_FOUND"
+    assert len(answer_key(quiz["id"])) == 5
+
+
+async def test_edit_quiz_not_ready_or_old_format_is_409(
+    client_a: AsyncClient, lecture_id: uuid.UUID
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    queued = (await client_a.post(f"/api/lessons/{lessons[0]['id']}/quizzes", json={})).json()
+    res = await client_a.get(f"/api/quizzes/{queued['id']}/edit")
+    assert res.status_code == 409 and res.json()["code"] == "QUIZ_NOT_READY"
+
+    with sync_session() as db:
+        old = Quiz(lecture_id=lecture_id, status="completed", num_questions=1)
+        db.add(old)
+        db.flush()
+        db.add(
+            Question(
+                quiz_id=old.id,
+                position=1,
+                question="Câu cũ?",
+                options=["A", "B", "C", "D"],
+                answer_index=0,
+                explanation="",
+                page_ref=1,
+                chapter_idx=0,
+            )
+        )
+        db.commit()
+        old_id = old.id
+    res = await client_a.put(
+        f"/api/quizzes/{old_id}/questions", json={"questions": [manual("Câu?")]}
+    )
+    assert res.status_code == 409 and res.json()["code"] == "QUIZ_NOT_EDITABLE"
+
+
+async def test_edit_scope_quiz_assigns_lessons(
+    client_a: AsyncClient, lecture_id: uuid.UUID, memory_storage: MemoryStorage
+) -> None:
+    lessons = await outline(client_a, lecture_id)
+    with sync_session() as db:
+        LecturePipeline(db, FakeLLMClient(), memory_storage).run_lesson(uuid.UUID(lessons[1]["id"]))
+    ids = [lessons[0]["id"], lessons[1]["id"]]
+    quiz = (
+        await client_a.post(
+            f"/api/lectures/{lecture_id}/quizzes", json={"num_questions": 5, "lesson_ids": ids}
+        )
+    ).json()
+    with sync_session() as db:
+        LecturePipeline(db, FakeLLMClient(), memory_storage).run_quiz(uuid.UUID(quiz["id"]))
+    editable = (await client_a.get(f"/api/quizzes/{quiz['id']}/edit")).json()
+    assert [ls["id"] for ls in editable["lessons"]] == ids
+    kept = [as_input(q) for q in editable["questions"]]
+    second = editable["lessons"][1]
+
+    res = await client_a.put(
+        f"/api/quizzes/{quiz['id']}/questions", json={"questions": [*kept, manual("Thiếu bài?")]}
+    )
+    assert res.status_code == 422
+    assert res.json()["errors"][0]["field"] == f"questions.{len(kept)}.lesson_id"
+
+    extra = manual("Câu bài 2?", lesson_id=second["id"], page_ref=second["page_start"])
+    res = await client_a.put(
+        f"/api/quizzes/{quiz['id']}/questions", json={"questions": [*kept, extra]}
+    )
+    assert res.status_code == 200, res.text
+    assert res.json()["questions"][-1]["lesson_id"] == second["id"]
+    with sync_session() as db:
+        added = db.scalar(select(Question).where(Question.question == "Câu bài 2?"))
+        assert added is not None and added.chapter_idx == lessons_of(lecture_id)[1].idx
+    result = (
+        await client_a.post(f"/api/quizzes/{quiz['id']}/attempts", json={"answers": {}})
+    ).json()
+    assert sum(c["total"] for c in result["by_chapter"]) == len(kept) + 1
+    assert result["by_chapter"][1]["total"] >= 1

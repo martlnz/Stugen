@@ -1,4 +1,4 @@
-"""Model SQLAlchemy theo docs/design/data-model.md v1.2 (chưa có llm_calls)."""
+"""Model SQLAlchemy theo docs/design/data-model.md v1.4 (chưa có llm_calls)."""
 
 import uuid
 from datetime import UTC, datetime
@@ -75,6 +75,7 @@ class Session(UUIDPk, Base):
 
 LECTURE_STATUSES = ("queued", "processing", "completed", "failed")
 PROGRESS_STEPS = ("extracting", "summarizing", "slides", "quiz")
+QUESTION_SOURCES = ("ai", "edited", "manual")
 
 
 def _in(col: str, values: tuple[str, ...]) -> str:
@@ -227,6 +228,8 @@ class Quiz(UUIDPk, Base):
     num_questions: Mapped[int]
     is_default: Mapped[bool] = mapped_column(Boolean, server_default="false", default=False)
     error_message: Mapped[str | None] = mapped_column(Text)
+    # Lần lưu chỉnh sửa gần nhất (ADR-0018)
+    edited_at: Mapped[datetime | None]
     created_at: Mapped[datetime] = mapped_column(server_default=func.now(), default=utcnow)
 
     lecture: Mapped[Lecture] = relationship()
@@ -241,6 +244,7 @@ class Question(UUIDPk, Base):
         UniqueConstraint("quiz_id", "position"),
         CheckConstraint("jsonb_array_length(options) = 4", name="options_len"),
         CheckConstraint("answer_index BETWEEN 0 AND 3", name="answer_index_range"),
+        CheckConstraint(_in("source", QUESTION_SOURCES), name="source_valid"),
     )
 
     quiz_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("quizzes.id", ondelete="CASCADE"))
@@ -249,8 +253,10 @@ class Question(UUIDPk, Base):
     options: Mapped[list[Any]]
     answer_index: Mapped[int] = mapped_column(SmallInteger)
     explanation: Mapped[str] = mapped_column(Text)
-    page_ref: Mapped[int]
+    # NULL với câu nhập tay không ghi trang (ADR-0018)
+    page_ref: Mapped[int | None]
     chapter_idx: Mapped[int]
+    source: Mapped[str] = mapped_column(Text, server_default="ai", default="ai")
 
 
 class QuizAttempt(UUIDPk, Base):
